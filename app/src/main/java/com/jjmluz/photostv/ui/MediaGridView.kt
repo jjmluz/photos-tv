@@ -14,21 +14,27 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import coil3.SingletonImageLoader
+import coil3.request.ImageRequest
 import com.jjmluz.photostv.AppLocale
 import com.jjmluz.photostv.MediaGrid
 import com.jjmluz.photostv.data.MediaItem
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -42,6 +48,7 @@ private sealed interface Entry {
 }
 
 private const val COLUMNS = 6
+private const val PREFETCH_DELAY_MS = 400L
 private val SameYear = DateTimeFormatter.ofPattern("EEE, d 'de' MMMM", AppLocale)
 private val OtherYear = DateTimeFormatter.ofPattern("EEE, d 'de' MMMM 'de' yyyy", AppLocale)
 
@@ -86,6 +93,9 @@ fun MediaGridView(
     val entries = remember(state.items, groupByDay) { buildEntries(state.items, groupByDay) }
     val positions = remember(entries) { entries.withIndex().associate { (i, e) -> e.key to i } }
     val offset = if (title != null) 1 else 0
+    val context = LocalContext.current
+    val loader = SingletonImageLoader.get(context)
+    val sizes = rememberViewerSizes()
 
     if (state.items.isEmpty()) {
         // An empty page with more to come (e.g. right after a date jump): keep loading.
@@ -145,6 +155,14 @@ fun MediaGridView(
                 )
                 is Entry.Tile -> {
                     val focus = remember { FocusRequester() }
+                    var focused by remember { mutableStateOf(false) }
+                    if (focused) {
+                        // Resting on a tile: fetch what the viewer shows first, so opening it is sharp at once.
+                        LaunchedEffect(Unit) {
+                            delay(PREFETCH_DELAY_MS)
+                            loader.enqueue(ImageRequest.Builder(context).data(entry.item.screenUrl(sizes)).build())
+                        }
+                    }
                     if (entry.key == restoreKey) {
                         LaunchedEffect(restoreKey) {
                             focus.requestFocusSafely()
@@ -157,7 +175,10 @@ fun MediaGridView(
                         modifier = Modifier
                             .aspectRatio(1f)
                             .focusRequester(focus)
-                            .onFocusChanged { grid.focusedKey = trackFocus(grid.focusedKey, entry.key, it.hasFocus) },
+                            .onFocusChanged {
+                                focused = it.hasFocus
+                                grid.focusedKey = trackFocus(grid.focusedKey, entry.key, it.hasFocus)
+                            },
                         overlay = {
                             entry.item.durationMs?.let {
                                 VideoBadge(it, Modifier.align(Alignment.BottomEnd))

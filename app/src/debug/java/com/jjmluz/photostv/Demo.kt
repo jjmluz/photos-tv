@@ -57,7 +57,7 @@ fun demoImages(): Interceptor? = if (!onEmulator) null else Interceptor { chain 
     }
     val w = Regex("w(\\d+)").find(params)?.groupValues?.get(1) ?: "400"
     val h = Regex("-h(\\d+)").find(params)?.groupValues?.get(1) ?: "400"
-    // Thumbnails are square crops; full images keep a 3:2 landscape frame within the box.
+    // Square crops stay square; everything else keeps a 3:2 landscape frame within the box.
     val (width, height) = if ("-c" in params) w to h else w to (w.toInt() * 2 / 3).coerceAtMost(h.toInt()).toString()
     chain.proceed(chain.request().newBuilder().url("https://picsum.photos/seed/$seed/$width/$height".toHttpUrl()).build())
 }

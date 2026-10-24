@@ -23,7 +23,15 @@ data class MediaItem(
         get() = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp + timezoneOffsetMs), ZoneOffset.UTC)
 
     // "-rw" asks for WebP, which is compact and decodes natively.
-    fun thumbnailUrl(px: Int) = "$baseUrl=w$px-h$px-c-k-no-rw"
+    /**
+     * The whole frame with its shorter side at [px], so the viewer can stretch it as a placeholder
+     * without changing shape (tiles crop it themselves). A square crop when the size is unknown.
+     */
+    fun thumbnailUrl(px: Int): String {
+        if (width <= 0 || height <= 0) return "$baseUrl=w$px-h$px-c-k-no-rw"
+        val long = (px.toLong() * maxOf(width, height) / minOf(width, height)).toInt().coerceAtMost(px * 3)
+        return if (width >= height) "$baseUrl=w$long-h$px-k-no-rw" else "$baseUrl=w$px-h$long-k-no-rw"
+    }
     fun fullUrl(maxWidth: Int, maxHeight: Int) = "$baseUrl=w$maxWidth-h$maxHeight-k-no-rw"
     /**
      * Playback candidates, best first. Google's adaptive HLS stream starts fast and steps up to

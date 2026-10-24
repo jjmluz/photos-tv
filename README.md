@@ -17,7 +17,11 @@ match regardless of the TV's system language.
 - **Albums**: your albums (owned and shared), and the photos in each one
 - **Pessoas**: the people (and pets) Google Photos recognised, as round faces with their name and
   number of photos; open one to see their photos by day
-- **Viewer**: full-screen at the TV's native resolution. Videos stream over Google's adaptive HLS
+- **Viewer**: full-screen at the TV's native resolution. The app's window is 1080p even on a 4K
+  TV (the system scales it up), so a photo first shows at 1080p, which arrives almost at once,
+  then fades to its 4K version, drawn in a surface of its own that the TV shows unscaled. The
+  photos either side are prepared in the background, so ◀ ▶ land on sharp photos, and a photo
+  you rest on in the grid is fetched ahead of opening it. Videos stream over Google's adaptive HLS
   (starts fast, steps up to 1080p, which is the most Google Photos streams), with the 1080p/720p
   files and then the original upload as fallbacks. 4K originals can't be streamed: their server
   ignores byte-range requests. ◀ ▶ to browse, ▲ ▼ to show the date and place (when Google

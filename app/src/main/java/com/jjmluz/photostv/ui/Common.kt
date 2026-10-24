@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Border
@@ -47,10 +48,35 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.jjmluz.photostv.AppLocale
+import com.jjmluz.photostv.data.MediaItem
 import com.jjmluz.photostv.data.NotSignedInException
 
 /** Thumbnail edge in pixels; a bit over the focused tile size on a 1080p UI. */
 const val THUMB_PX = 400
+
+/**
+ * The sizes the viewer fetches photos at. The app window is 1080p even on a 4K TV (the system
+ * scales it up), so a photo fetched at the window size shows almost at once; the panel's native
+ * size (4K on the Streamer) is drawn into a surface of its own, which the TV shows unscaled.
+ */
+data class ViewerSizes(val windowW: Int, val windowH: Int, val panelW: Int, val panelH: Int) {
+    val hasFullRes get() = panelW > windowW
+}
+
+fun MediaItem.screenUrl(sizes: ViewerSizes) = fullUrl(sizes.windowW, sizes.windowH)
+fun MediaItem.fullResUrl(sizes: ViewerSizes) = fullUrl(sizes.panelW, sizes.panelH)
+
+@Composable
+fun rememberViewerSizes(): ViewerSizes {
+    val context = LocalContext.current
+    val window = LocalWindowInfo.current.containerSize
+    return remember(window) {
+        val mode = context.display.mode
+        val panelW = maxOf(mode.physicalWidth, mode.physicalHeight).coerceAtMost(3840)
+        val panelH = minOf(mode.physicalWidth, mode.physicalHeight).coerceAtMost(2160)
+        ViewerSizes(window.width, window.height, maxOf(panelW, window.width), maxOf(panelH, window.height))
+    }
+}
 
 val TileShape = RoundedCornerShape(16.dp)
 

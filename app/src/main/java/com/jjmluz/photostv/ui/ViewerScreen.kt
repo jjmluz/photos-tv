@@ -1,12 +1,23 @@
 package com.jjmluz.photostv.ui
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Paint
+import android.graphics.RectF
 import android.util.Log
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.height
@@ -67,13 +78,21 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.crossfade
+import coil3.size.Precision
+import coil3.toBitmap
 import com.jjmluz.photostv.AppLocale
 import com.jjmluz.photostv.Viewer
 import com.jjmluz.photostv.app
 import com.jjmluz.photostv.data.MediaItem
 import com.jjmluz.photostv.data.VideoSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
 private const val TAG = "PhotosTV"
@@ -83,6 +102,7 @@ private const val CONTROLS_TIMEOUT_MS = 3_000L
 private const val SEEK_STEP_MS = 10_000L
 private const val SEEK_FAST_MS = 30_000L
 private const val SEEK_RUN_RESET_MS = 1_200L
+private const val FULL_RES_FADE_MS = 300
 private val DateFormat = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy · HH:mm", AppLocale)
 
 /**
@@ -101,8 +121,12 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
     var location by remember { mutableStateOf<String?>(null) }
     val focus = remember { FocusRequester() }
 
-    val (screenW, screenH) = rememberScreenPixels()
-    fun fullUrl(i: Int) = items.getOrNull(i)?.fullUrl(screenW, screenH)
+    val sizes = rememberViewerSizes()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val fullRes = remember(sizes) { if (sizes.hasFullRes) FullResImages(context, scope, sizes) else null }
+    val surface = remember(sizes) { FullResSurface() }
+    fun screenRequest(it: MediaItem) = ImageRequest.Builder(context).data(it.screenUrl(sizes)).build()
 
     fun go(delta: Int): Boolean {
         val next = index + delta
@@ -118,16 +142,22 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         }
     }
 
-    // Preload neighbours so moving left/right is instant, and keep the feed ahead of us.
-    val context = LocalContext.current
     LaunchedEffect(index) { Log.d(TAG, "Viewer: index $index video=${item?.isVideo}") }
 
+    // The photo on screen loads first; then its neighbours, one at a time so they don't take
+    // its bandwidth, and moving left/right is instant. Also keeps the feed ahead of us.
     LaunchedEffect(index, items.size) {
-        val loader = SingletonImageLoader.get(context)
-        listOf(index + 1, index - 1, index + 2).forEach { i ->
-            fullUrl(i)?.let { loader.enqueue(ImageRequest.Builder(context).data(it).build()) }
-        }
         if (index >= items.size - 10) viewer.grid.feed.loadMore()
+        val loader = SingletonImageLoader.get(context)
+        fullRes?.retain((index - 1..index + 1).mapNotNull { items.getOrNull(it)?.key }.toSet())
+        listOf(index, index + 1, index - 1).forEach { i ->
+            val near = items.getOrNull(i) ?: return@forEach
+            when {
+                fullRes != null && !near.isVideo -> fullRes.load(near).join()
+                i != index -> loader.execute(screenRequest(near))
+            }
+        }
+        items.getOrNull(index + 2)?.let { loader.execute(screenRequest(it)) }
     }
 
     // Look the place up ahead of time so it is ready when the overlay opens.
@@ -177,17 +207,38 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
             .focusable(),
     ) {
         if (item != null) {
-            AsyncImage(
-                model = remember(item.key, screenW) {
-                    ImageRequest.Builder(context)
-                        .data(item.fullUrl(screenW, screenH))
-                        .placeholderMemoryCacheKey(item.thumbnailUrl(THUMB_PX))
-                        .build()
-                },
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
+            // Under everything, the 4K layer (left out while a video plays, which has its own surface).
+            val full = if (item.isVideo) null else fullRes?.bitmaps?.get(item.key)
+            if (fullRes != null && playing == null) {
+                AndroidView(
+                    factory = { SurfaceView(it).apply { holder.setFixedSize(sizes.panelW, sizes.panelH); holder.addCallback(surface) } },
+                    update = { surface.bitmap = full },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            key(item.key) {
+                // Over it, the thumbnail and then the 1080p image, until the 4K one is on screen. When
+                // it was ready on arrival they're skipped; otherwise the 4K layer fades in over them.
+                val readyOnArrival = remember { full != null }
+                val sharp = full != null && surface.shown === full
+                val coverAlpha by animateFloatAsState(if (sharp) 0f else 1f, tween(FULL_RES_FADE_MS), label = "cover")
+                if (!readyOnArrival) {
+                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = coverAlpha }.background(Color.Black)) {
+                        AsyncImage(
+                            model = remember(sizes) {
+                                ImageRequest.Builder(context)
+                                    .data(item.screenUrl(sizes))
+                                    .placeholderMemoryCacheKey(item.thumbnailUrl(THUMB_PX))
+                                    .crossfade(true)
+                                    .build()
+                            },
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
             if (item.isVideo) {
                 Box(
                     Modifier
@@ -212,7 +263,7 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
 
     LaunchedEffect(playing) { if (playing == null) focus.requestFocusSafely() }
 
-    playing?.let { VideoPlayer(it, posterUrl = it.fullUrl(screenW, screenH), onEnded = { playing = null }) }
+    playing?.let { VideoPlayer(it, posterUrl = it.screenUrl(sizes), onEnded = { playing = null }) }
 }
 
 @Composable
@@ -504,14 +555,82 @@ private fun videoHttp(context: Context) = context.app.http.newBuilder()
     }
     .build()
 
-/** Physical display size, so photos are fetched at the TV's native resolution (4K on the Streamer). */
-@Composable
-private fun rememberScreenPixels(): Pair<Int, Int> {
-    val context = LocalContext.current
-    return remember {
-        val mode = context.display.mode
-        val w = maxOf(mode.physicalWidth, mode.physicalHeight).coerceAtMost(3840)
-        val h = minOf(mode.physicalWidth, mode.physicalHeight).coerceAtMost(2160)
-        w to h
+/**
+ * Photos at the panel's native size, for the photo on screen and its neighbours. They're kept
+ * here rather than in Coil's memory cache, where three 4K bitmaps would push out the thumbnails.
+ */
+private class FullResImages(private val context: Context, private val scope: CoroutineScope, private val sizes: ViewerSizes) {
+    val bitmaps = mutableStateMapOf<String, Bitmap>()
+    private val jobs = HashMap<String, Job>()
+
+    fun load(item: MediaItem): Job = jobs.getOrPut(item.key) {
+        scope.launch {
+            val start = System.currentTimeMillis()
+            val request = ImageRequest.Builder(context)
+                .data(item.fullResUrl(sizes))
+                .size(sizes.panelW, sizes.panelH)
+                .precision(Precision.INEXACT)
+                .memoryCachePolicy(CachePolicy.DISABLED)
+                .build()
+            when (val result = SingletonImageLoader.get(context).execute(request)) {
+                is SuccessResult -> {
+                    bitmaps[item.key] = result.image.toBitmap()
+                    Log.d(TAG, "Viewer: full resolution ${result.image.width}x${result.image.height} in ${System.currentTimeMillis() - start} ms (${result.dataSource})")
+                }
+                // Let a later visit try again.
+                else -> jobs.remove(item.key)
+            }
+        }
+    }
+
+    /** Drops everything but [keys], cancelling their downloads. */
+    fun retain(keys: Set<String>) {
+        jobs.keys.filter { it !in keys }.forEach { jobs.remove(it)?.cancel() }
+        bitmaps.keys.filter { it !in keys }.forEach { bitmaps.remove(it) }
+    }
+}
+
+/**
+ * Draws [bitmap] into a SurfaceView sized to the panel. The TV composes that surface at its
+ * native resolution, unlike the app window, which it scales up from 1080p.
+ */
+private class FullResSurface : SurfaceHolder.Callback {
+    private var holder: SurfaceHolder? = null
+    private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+    var bitmap: Bitmap? = null
+        set(value) {
+            if (field === value && shown === value) return
+            field = value
+            draw()
+        }
+
+    /** What the surface shows now, once drawn. */
+    var shown by mutableStateOf<Bitmap?>(null)
+        private set
+
+    override fun surfaceCreated(holder: SurfaceHolder) { this.holder = holder }
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) { draw() }
+    override fun surfaceDestroyed(holder: SurfaceHolder) {
+        this.holder = null
+        shown = null
+    }
+
+    private fun draw() {
+        val surface = holder?.surface?.takeIf { it.isValid } ?: return
+        val frame = holder!!.surfaceFrame
+        val bmp = bitmap
+        val canvas = surface.lockHardwareCanvas()
+        canvas.drawColor(android.graphics.Color.BLACK)
+        if (bmp != null) {
+            val scale = minOf(frame.width().toFloat() / bmp.width, frame.height().toFloat() / bmp.height)
+            val w = bmp.width * scale
+            val h = bmp.height * scale
+            val left = (frame.width() - w) / 2
+            val top = (frame.height() - h) / 2
+            canvas.drawBitmap(bmp, null, RectF(left, top, left + w, top + h), paint)
+        }
+        surface.unlockCanvasAndPost(canvas)
+        shown = bmp
     }
 }
