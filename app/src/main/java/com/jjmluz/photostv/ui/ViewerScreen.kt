@@ -244,10 +244,10 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                     Modifier
                         .align(Alignment.Center)
                         .size(96.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f), CircleShape),
+                        .background(ControlColor.copy(alpha = 0.9f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Reproduzir", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(56.dp))
+                    Icon(Icons.Filled.PlayArrow, contentDescription = "Reproduzir", tint = OnControlColor, modifier = Modifier.size(56.dp))
                 }
             }
             AnimatedVisibility(
@@ -445,11 +445,11 @@ private fun VideoPlayer(item: MediaItem, posterUrl: String, onEnded: () -> Unit)
         Box(Modifier.align(Alignment.Center)) {
             when {
                 !started || (buffering && seekRun == 0L) -> CenterDisc {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimaryContainer, strokeWidth = 4.dp, modifier = Modifier.size(52.dp))
+                    CircularProgressIndicator(color = OnControlColor, strokeWidth = 4.dp, modifier = Modifier.size(52.dp))
                 }
                 seekRun != 0L -> SeekChip(seekRun)
                 paused -> CenterDisc {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(56.dp))
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = OnControlColor, modifier = Modifier.size(56.dp))
                 }
             }
         }
@@ -464,10 +464,14 @@ private fun VideoPlayer(item: MediaItem, posterUrl: String, onEnded: () -> Unit)
     }
 }
 
+/** Video controls are white with dark icons, like the TV's own player, rather than the theme's blue. */
+private val ControlColor = Color.White
+private val OnControlColor = Color(0xFF1F1F1F)
+
 @Composable
 private fun CenterDisc(content: @Composable () -> Unit) {
     Box(
-        Modifier.size(96.dp).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f), CircleShape),
+        Modifier.size(96.dp).background(ControlColor.copy(alpha = 0.9f), CircleShape),
         contentAlignment = Alignment.Center,
     ) { content() }
 }
@@ -476,7 +480,7 @@ private fun CenterDisc(content: @Composable () -> Unit) {
 private fun SeekChip(deltaMs: Long) {
     Row(
         Modifier
-            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f), CircleShape)
+            .background(ControlColor.copy(alpha = 0.9f), CircleShape)
             .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -484,13 +488,13 @@ private fun SeekChip(deltaMs: Long) {
         Icon(
             if (deltaMs > 0) Icons.Filled.FastForward else Icons.Filled.FastRewind,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            tint = OnControlColor,
             modifier = Modifier.size(28.dp),
         )
         Text(
             (if (deltaMs > 0) "+" else "−") + formatDuration(kotlin.math.abs(deltaMs)),
             style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = OnControlColor,
         )
     }
 }
@@ -506,13 +510,13 @@ private fun VideoControls(position: Long, buffered: Long, duration: Long, paused
         horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Box(
-            Modifier.size(48.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            Modifier.size(48.dp).background(ControlColor, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                 contentDescription = if (paused) "Em pausa" else "A reproduzir",
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = OnControlColor,
                 modifier = Modifier.size(28.dp),
             )
         }
@@ -529,7 +533,7 @@ private fun VideoControls(position: Long, buffered: Long, duration: Long, paused
 /** A rounded track with the buffered part, the played part and a thumb at the playhead. */
 @Composable
 private fun ProgressBar(played: Float, buffered: Float, modifier: Modifier = Modifier) {
-    val primary = MaterialTheme.colorScheme.primary
+    val playedColor = ControlColor
     val track = Color.White.copy(alpha = 0.25f)
     val loaded = Color.White.copy(alpha = 0.45f)
     Canvas(modifier.height(16.dp)) {
@@ -538,8 +542,8 @@ private fun ProgressBar(played: Float, buffered: Float, modifier: Modifier = Mod
         fun line(to: Float, color: Color) = drawLine(color, Offset(0f, y), Offset(size.width * to.coerceIn(0f, 1f), y), stroke, StrokeCap.Round)
         line(1f, track)
         line(buffered, loaded)
-        line(played, primary)
-        drawCircle(primary, radius = 8.dp.toPx(), center = Offset(size.width * played.coerceIn(0f, 1f), y))
+        line(played, playedColor)
+        drawCircle(playedColor, radius = 8.dp.toPx(), center = Offset(size.width * played.coerceIn(0f, 1f), y))
     }
 }
 
