@@ -1,6 +1,12 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
 }
 
 android {
@@ -14,6 +20,9 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        // Jamendo API client id for slideshow music, kept in local.properties (not in git).
+        // Without one, the music options are shown but can't be picked.
+        buildConfigField("String", "JAMENDO_CLIENT_ID", "\"${localProperties.getProperty("jamendo.clientId", "")}\"")
     }
 
     buildTypes {
@@ -33,6 +42,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

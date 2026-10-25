@@ -17,8 +17,10 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
 import com.jjmluz.photostv.data.GoogleAccount
+import com.jjmluz.photostv.data.Jamendo
 import com.jjmluz.photostv.data.PairingServer
 import com.jjmluz.photostv.data.PhotosApi
+import com.jjmluz.photostv.data.SlideshowSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -71,6 +73,10 @@ class PhotosTvApp : Application(), SingletonImageLoader.Factory {
     }
 
     val api by lazy { demoApi() ?: PhotosApi(http, renewSession = account::renewSession) }
+
+    val slideshowSettings by lazy { SlideshowSettings(this) }
+
+    val jamendo by lazy { Jamendo(http, BuildConfig.JAMENDO_CLIENT_ID) }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)

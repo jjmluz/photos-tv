@@ -12,6 +12,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.key
@@ -65,6 +67,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.PlaybackException
@@ -87,6 +91,7 @@ import coil3.toBitmap
 import com.jjmluz.photostv.AppLocale
 import com.jjmluz.photostv.Viewer
 import com.jjmluz.photostv.app
+import com.jjmluz.photostv.data.BackgroundMusic
 import com.jjmluz.photostv.data.MediaItem
 import com.jjmluz.photostv.data.VideoSource
 import kotlinx.coroutines.CoroutineScope
@@ -96,7 +101,7 @@ import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
 private const val TAG = "PhotosTV"
-private const val SLIDESHOW_INTERVAL_MS = 5_000L
+private const val SLIDESHOW_STATUS_MS = 3_000L
 private const val OVERLAY_TIMEOUT_MS = 4_000L
 private const val CONTROLS_TIMEOUT_MS = 3_000L
 private const val SEEK_STEP_MS = 10_000L
@@ -107,7 +112,11 @@ private val DateFormat = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyy
 
 /**
  * Full-screen viewer. Left/right move between items, up/down toggle the date and place,
- * center plays a video, play/pause runs a slideshow, back returns to the grid.
+ * OK plays a video, holding OK (or the menu key) opens the slideshow menu, play/pause runs the
+ * slideshow from a photo, back returns to the grid.
+ *
+ * The slideshow shows photos only, skipping videos: OK or play/pause pauses it, left/right step
+ * between photos, back ends it on the photo showing.
  */
 @Composable
 fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onClose: (lastKey: String?) -> Unit) {
@@ -116,6 +125,15 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
     var index by remember { mutableIntStateOf(viewer.startIndex) }
     var overlay by remember { mutableStateOf(false) }
     var slideshow by remember { mutableStateOf(false) }
+    var paused by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    // OK went down here (not in the grid that opened the viewer), so its release is a press.
+    var okDown by remember { mutableStateOf(false) }
+    // OK is still held after opening the menu: its repeats and release must not reach the menu.
+    var swallowOk by remember { mutableStateOf(false) }
+    // Bumped to show the slideshow's status for a moment.
+    var status by remember { mutableIntStateOf(0) }
+    var statusShown by remember { mutableStateOf(false) }
     var playing by remember { mutableStateOf<MediaItem?>(null) }
     val item = items.getOrNull(index)
     var location by remember { mutableStateOf<String?>(null) }
@@ -127,6 +145,9 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
     val fullRes = remember(sizes) { if (sizes.hasFullRes) FullResImages(context, scope, sizes) else null }
     val surface = remember(sizes) { FullResSurface() }
     fun screenRequest(it: MediaItem) = ImageRequest.Builder(context).data(it.screenUrl(sizes)).build()
+    val settings = context.app.slideshowSettings
+    val music = remember { BackgroundMusic(context, context.app.http, context.app.jamendo, scope) }
+    DisposableEffect(music) { onDispose { music.release() } }
 
     fun go(delta: Int): Boolean {
         val next = index + delta
@@ -135,29 +156,63 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         return true
     }
 
+    /** The nearest photo past [from] in the direction of [delta], skipping videos. */
+    fun photoIndex(from: Int, delta: Int): Int? {
+        var i = from + delta
+        while (i in items.indices) {
+            if (!items[i].isVideo) return i
+            i += delta
+        }
+        return null
+    }
+
+    fun startSlideshow() {
+        if (item == null || item.isVideo) return
+        slideshow = true
+        paused = false
+        status++
+    }
+
+    fun togglePause() {
+        paused = !paused
+        if (!paused) status++
+    }
+
+    fun openMenu() {
+        menu = true
+        overlay = false
+    }
+
     BackHandler {
         when {
             playing != null -> playing = null
+            slideshow -> slideshow = false
             else -> onClose(item?.key)
         }
     }
+
+    // Leaving the app pauses the slideshow, and with it the music.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { paused = true }
 
     LaunchedEffect(index) { Log.d(TAG, "Viewer: index $index video=${item?.isVideo}") }
 
     // The photo on screen loads first; then its neighbours, one at a time so they don't take
     // its bandwidth, and moving left/right is instant. Also keeps the feed ahead of us.
-    LaunchedEffect(index, items.size) {
+    // In a slideshow the neighbours are the photos either side, past any videos.
+    LaunchedEffect(index, items.size, slideshow) {
         if (index >= items.size - 10) viewer.grid.feed.loadMore()
         val loader = SingletonImageLoader.get(context)
-        fullRes?.retain((index - 1..index + 1).mapNotNull { items.getOrNull(it)?.key }.toSet())
-        listOf(index, index + 1, index - 1).forEach { i ->
+        val next = (if (slideshow) photoIndex(index, 1) else null) ?: (index + 1)
+        val previous = (if (slideshow) photoIndex(index, -1) else null) ?: (index - 1)
+        fullRes?.retain(listOf(previous, index, next).mapNotNull { items.getOrNull(it)?.key }.toSet())
+        listOf(index, next, previous).forEach { i ->
             val near = items.getOrNull(i) ?: return@forEach
             when {
                 fullRes != null && !near.isVideo -> fullRes.load(near).join()
                 i != index -> loader.execute(screenRequest(near))
             }
         }
-        items.getOrNull(index + 2)?.let { loader.execute(screenRequest(it)) }
+        items.getOrNull(next + 1)?.let { loader.execute(screenRequest(it)) }
     }
 
     // Look the place up ahead of time so it is ready when the overlay opens.
@@ -173,95 +228,181 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         }
     }
 
-    LaunchedEffect(slideshow, index) {
-        if (!slideshow) return@LaunchedEffect
-        delay(SLIDESHOW_INTERVAL_MS)
+    // The timer for the photo showing, held while paused or with the menu open.
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(slideshow, paused, menu, index, settings.seconds) {
+        progress.snapTo(0f)
+        if (!slideshow || paused || menu) return@LaunchedEffect
+        progress.animateTo(1f, tween(settings.seconds * 1_000, easing = LinearEasing))
         // Wrap around at the end of what has loaded so far.
-        if (!go(1)) index = 0
+        photoIndex(index, 1)?.let { index = it } ?: photoIndex(-1, 1)?.let { index = it }
+    }
+
+    LaunchedEffect(slideshow, paused, settings.music) {
+        when {
+            !slideshow -> music.stop()
+            paused -> music.pause()
+            else -> music.play(settings.music)
+        }
+    }
+
+    // Each new track shows the status, which credits its artist.
+    LaunchedEffect(music.track) { if (music.track != null && slideshow) status++ }
+    LaunchedEffect(status) {
+        if (status == 0) return@LaunchedEffect
+        statusShown = true
+        delay(SLIDESHOW_STATUS_MS)
+        statusShown = false
     }
 
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .focusRequester(focus)
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                when (event.key) {
-                    Key.DirectionRight -> { slideshow = false; go(1); true }
-                    Key.DirectionLeft -> { slideshow = false; go(-1); true }
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        if (item?.isVideo == true) playing = item
-                        true
-                    }
-                    Key.DirectionUp, Key.DirectionDown -> { overlay = !overlay; true }
-                    Key.MediaPlayPause, Key.MediaPlay -> {
-                        slideshow = !slideshow
-                        overlay = false
-                        true
-                    }
-                    Key.MediaPause, Key.MediaStop -> { slideshow = false; true }
-                    else -> false
-                }
-            }
-            .focusable(),
+            .onPreviewKeyEvent { event ->
+                if (!swallowOk || !event.key.isOk) return@onPreviewKeyEvent false
+                if (event.type == KeyEventType.KeyUp) swallowOk = false
+                true
+            },
     ) {
-        if (item != null) {
-            // Under everything, the 4K layer (left out while a video plays, which has its own surface).
-            val full = if (item.isVideo) null else fullRes?.bitmaps?.get(item.key)
-            if (fullRes != null && playing == null) {
-                AndroidView(
-                    factory = { SurfaceView(it).apply { holder.setFixedSize(sizes.panelW, sizes.panelH); holder.addCallback(surface) } },
-                    update = { surface.bitmap = full },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            key(item.key) {
-                // Over it, the thumbnail and then the 1080p image, until the 4K one is on screen. When
-                // it was ready on arrival they're skipped; otherwise the 4K layer fades in over them.
-                val readyOnArrival = remember { full != null }
-                val sharp = full != null && surface.shown === full
-                val coverAlpha by animateFloatAsState(if (sharp) 0f else 1f, tween(FULL_RES_FADE_MS), label = "cover")
-                if (!readyOnArrival) {
-                    Box(Modifier.fillMaxSize().graphicsLayer { alpha = coverAlpha }.background(Color.Black)) {
-                        AsyncImage(
-                            model = remember(sizes) {
-                                ImageRequest.Builder(context)
-                                    .data(item.screenUrl(sizes))
-                                    .placeholderMemoryCacheKey(item.thumbnailUrl(THUMB_PX))
-                                    .crossfade(true)
-                                    .build()
-                            },
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .focusRequester(focus)
+                .onKeyEvent { event ->
+                    val down = event.type == KeyEventType.KeyDown
+                    if (event.key.isOk) {
+                        val repeats = event.nativeKeyEvent.repeatCount
+                        when {
+                            down && repeats == 0 -> okDown = true
+                            // Held: the first repeat comes after the system's long-press delay.
+                            down && okDown && repeats == 1 -> {
+                                okDown = false
+                                swallowOk = true
+                                openMenu()
+                            }
+                            !down && okDown -> {
+                                okDown = false
+                                when {
+                                    item?.isVideo == true -> playing = item
+                                    slideshow -> togglePause()
+                                }
+                            }
+                        }
+                        return@onKeyEvent true
+                    }
+                    if (!down) return@onKeyEvent false
+                    when (event.key) {
+                        Key.DirectionRight -> { if (slideshow) photoIndex(index, 1)?.let { index = it } else go(1); true }
+                        Key.DirectionLeft -> { if (slideshow) photoIndex(index, -1)?.let { index = it } else go(-1); true }
+                        Key.DirectionUp, Key.DirectionDown -> { overlay = !overlay; true }
+                        Key.Menu -> { openMenu(); true }
+                        Key.MediaPlayPause -> {
+                            when {
+                                slideshow -> togglePause()
+                                item?.isVideo == true -> playing = item
+                                else -> startSlideshow()
+                            }
+                            true
+                        }
+                        Key.MediaPlay -> {
+                            when {
+                                slideshow && paused -> togglePause()
+                                !slideshow -> startSlideshow()
+                            }
+                            true
+                        }
+                        Key.MediaPause -> { if (slideshow && !paused) togglePause(); true }
+                        Key.MediaStop -> { slideshow = false; true }
+                        else -> false
                     }
                 }
-            }
-            if (item.isVideo) {
-                Box(
-                    Modifier
-                        .align(Alignment.Center)
-                        .size(96.dp)
-                        .background(ControlColor.copy(alpha = 0.9f), CircleShape),
-                    contentAlignment = Alignment.Center,
+                .focusable(),
+        ) {
+            if (item != null) {
+                // Under everything, the 4K layer (left out while a video plays, which has its own surface).
+                val full = if (item.isVideo) null else fullRes?.bitmaps?.get(item.key)
+                if (fullRes != null && playing == null) {
+                    AndroidView(
+                        factory = { SurfaceView(it).apply { holder.setFixedSize(sizes.panelW, sizes.panelH); holder.addCallback(surface) } },
+                        update = { surface.bitmap = full },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                key(item.key) {
+                    // Over it, the thumbnail and then the 1080p image, until the 4K one is on screen. When
+                    // it was ready on arrival they're skipped; otherwise the 4K layer fades in over them.
+                    val readyOnArrival = remember { full != null }
+                    val sharp = full != null && surface.shown === full
+                    val coverAlpha by animateFloatAsState(if (sharp) 0f else 1f, tween(FULL_RES_FADE_MS), label = "cover")
+                    if (!readyOnArrival) {
+                        Box(Modifier.fillMaxSize().graphicsLayer { alpha = coverAlpha }.background(Color.Black)) {
+                            AsyncImage(
+                                model = remember(sizes) {
+                                    ImageRequest.Builder(context)
+                                        .data(item.screenUrl(sizes))
+                                        .placeholderMemoryCacheKey(item.thumbnailUrl(THUMB_PX))
+                                        .crossfade(true)
+                                        .build()
+                                },
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                }
+                if (item.isVideo) {
+                    Box(
+                        Modifier
+                            .align(Alignment.Center)
+                            .size(96.dp)
+                            .background(ControlColor.copy(alpha = 0.9f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = "Reproduzir", tint = OnControlColor, modifier = Modifier.size(56.dp))
+                    }
+                }
+                AnimatedVisibility(
+                    visible = overlay,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomStart),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Reproduzir", tint = OnControlColor, modifier = Modifier.size(56.dp))
+                    InfoOverlay(item, location)
+                }
+                if (slideshow && paused && !menu) {
+                    SlideshowPaused(music.track)
+                }
+                AnimatedVisibility(
+                    visible = slideshow && !paused && !menu && statusShown,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    SlideshowStatus(settings.seconds, music.track, progress.value)
                 }
             }
-            AnimatedVisibility(
-                visible = overlay,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.BottomStart),
-            ) {
-                InfoOverlay(item, location)
-            }
+        }
+        if (menu) {
+            SlideshowMenu(
+                settings = settings,
+                canStart = item?.isVideo == false,
+                running = slideshow,
+                musicAvailable = context.app.jamendo.available,
+                onStart = {
+                    menu = false
+                    if (slideshow) {
+                        if (paused) togglePause()
+                    } else {
+                        startSlideshow()
+                    }
+                },
+                onDismiss = { menu = false },
+            )
         }
     }
 
-    LaunchedEffect(playing) { if (playing == null) focus.requestFocusSafely() }
+    LaunchedEffect(playing, menu) { if (playing == null && !menu) focus.requestFocusSafely() }
 
     playing?.let { VideoPlayer(it, posterUrl = it.screenUrl(sizes), onEnded = { playing = null }) }
 }
@@ -465,11 +606,11 @@ private fun VideoPlayer(item: MediaItem, posterUrl: String, onEnded: () -> Unit)
 }
 
 /** Video controls are white with dark icons, like the TV's own player, rather than the theme's blue. */
-private val ControlColor = Color.White
-private val OnControlColor = Color(0xFF1F1F1F)
+val ControlColor = Color.White
+val OnControlColor = Color(0xFF1F1F1F)
 
 @Composable
-private fun CenterDisc(content: @Composable () -> Unit) {
+fun CenterDisc(content: @Composable () -> Unit) {
     Box(
         Modifier.size(96.dp).background(ControlColor.copy(alpha = 0.9f), CircleShape),
         contentAlignment = Alignment.Center,
@@ -546,6 +687,8 @@ private fun ProgressBar(played: Float, buffered: Float, modifier: Modifier = Mod
         drawCircle(playedColor, radius = 8.dp.toPx(), center = Offset(size.width * played.coerceIn(0f, 1f), y))
     }
 }
+
+private val Key.isOk get() = this == Key.DirectionCenter || this == Key.Enter || this == Key.NumPadEnter
 
 private fun VideoSource.toMediaItem() =
     ExoMediaItem.Builder().setUri(url).setMimeType(mimeType).build()
