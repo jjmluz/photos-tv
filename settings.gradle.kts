@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "PhotosTV"
 include(":app")
+include(":phone")

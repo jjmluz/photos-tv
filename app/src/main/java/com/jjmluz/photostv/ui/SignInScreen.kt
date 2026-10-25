@@ -1,5 +1,6 @@
 package com.jjmluz.photostv.ui
 
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -20,15 +20,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jjmluz.photostv.R
 import com.jjmluz.photostv.app
 import com.jjmluz.photostv.data.CookieImport
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -37,16 +43,17 @@ private const val TAG = "PhotosTV"
 private const val FILE_NAME = "cookies.txt"
 
 /**
- * Sign-in by importing a Google session from a desktop browser. Google blocks every way for a
- * third-party TV app to sign in to Photos directly, so the session comes from the Fotos TV Chrome
- * extension (see [com.jjmluz.photostv.data.CookieSync]) or a cookies.txt pushed with adb.
+ * Sign-in from the phone. Google blocks every way for a third-party TV app to sign in to Photos on
+ * the TV itself, so the account comes from the Fotos TV phone app, which pairs by scanning the QR
+ * code (see [com.jjmluz.photostv.data.PairingServer] and [com.jjmluz.photostv.data.GoogleAccount]).
+ * A cookies.txt pushed with adb also works, as a one-off session.
  */
 @Composable
 fun SignInScreen(onImported: () -> Unit) {
     val context = LocalContext.current
     val dir = remember { context.getExternalFilesDir(null)!! }
     var error by remember { mutableStateOf<String?>(null) }
-    val sync = context.app.cookieSync
+    val pairing = context.app.pairing
 
     LaunchedEffect(Unit) {
         val file = dir.resolve(FILE_NAME)
@@ -68,30 +75,26 @@ fun SignInScreen(onImported: () -> Unit) {
     }
 
     Row(
-        Modifier.fillMaxSize().padding(horizontal = 96.dp),
+        Modifier.fillMaxSize().padding(horizontal = 64.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(64.dp),
+        horizontalArrangement = Arrangement.spacedBy(48.dp),
     ) {
-        Image(
-            painterResource(R.drawable.ic_launcher_foreground),
-            contentDescription = null,
-            modifier = Modifier.size(200.dp),
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.width(860.dp)) {
-            Text("Iniciar sessão com o navegador", style = MaterialTheme.typography.displaySmall)
-            Step(1, "No computador, instale a extensão Fotos TV no Chrome e abra photos.google.com com sessão iniciada.")
-            Step(2, "Na extensão, introduza o endereço e o código desta TV:")
-            Column(
-                Modifier
-                    .padding(start = 48.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.large)
-                    .padding(horizontal = 28.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                PairingField("Endereço", sync.address() ?: "sem rede")
-                PairingField("Código", sync.code)
+        val qr = remember { pairing.pairingUri()?.let(::qrCode) }
+        Box(
+            // QR codes need a light quiet zone around them to scan, whatever the theme.
+            Modifier.size(232.dp).background(Color.White, MaterialTheme.shapes.large).padding(16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (qr != null) {
+                Image(qr, contentDescription = "Código QR para emparelhar", filterQuality = FilterQuality.None, modifier = Modifier.fillMaxSize())
+            } else {
+                Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, modifier = Modifier.fillMaxSize())
             }
-            Step(3, "A TV inicia sessão sozinha e mantém-se sincronizada enquanto o Chrome estiver aberto.")
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.weight(1f)) {
+            Text("Iniciar sessão", style = MaterialTheme.typography.displaySmall)
+            Step(1, "No telemóvel, abra a app Fotos TV e leia este código.")
+            Step(2, "Inicie sessão na sua conta Google. A TV fica com sessão própria e renova-a sozinha.")
             Text(
                 "Em alternativa, exporte os cookies como $FILE_NAME e envie-os com " +
                     "adb push <ficheiro> ${dir.absolutePath.replace("/storage/emulated/0", "/sdcard")}/$FILE_NAME",
@@ -100,7 +103,7 @@ fun SignInScreen(onImported: () -> Unit) {
                 modifier = Modifier.padding(top = 12.dp),
             )
             Text(
-                error ?: "À espera da extensão…",
+                error ?: if (qr != null) "À espera do telemóvel…" else "A TV não está ligada à rede.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 4.dp),
@@ -109,12 +112,13 @@ fun SignInScreen(onImported: () -> Unit) {
     }
 }
 
-@Composable
-private fun PairingField(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace), softWrap = false)
+/** [text] as a QR code, one pixel per module, to be scaled up without smoothing. */
+private fun qrCode(text: String): ImageBitmap {
+    val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 0, 0, mapOf(EncodeHintType.MARGIN to 0))
+    val pixels = IntArray(matrix.width * matrix.height) { i ->
+        if (matrix[i % matrix.width, i / matrix.width]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
     }
+    return Bitmap.createBitmap(pixels, matrix.width, matrix.height, Bitmap.Config.ARGB_8888).asImageBitmap()
 }
 
 @Composable

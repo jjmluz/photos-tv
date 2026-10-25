@@ -16,12 +16,14 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
-import com.jjmluz.photostv.data.CookieSync
+import com.jjmluz.photostv.data.GoogleAccount
+import com.jjmluz.photostv.data.PairingServer
 import com.jjmluz.photostv.data.PhotosApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import com.jjmluz.photostv.data.WebViewCookieJar
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import java.util.Locale
@@ -34,15 +36,17 @@ val AppLocale: Locale = Locale.forLanguageTag("pt-PT")
 
 class PhotosTvApp : Application(), SingletonImageLoader.Factory {
 
-    /** Lives as long as the process: the cookie receiver keeps listening while the app is backgrounded. */
+    /** Lives as long as the process: the pairing server keeps listening while the app is backgrounded. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    val cookieSync by lazy { CookieSync(this, scope) }
+    val account by lazy { GoogleAccount(this, http) }
+
+    val pairing by lazy { PairingServer(this, scope, account) }
 
     override fun onCreate() {
         super.onCreate()
         Locale.setDefault(AppLocale)
-        cookieSync.start()
+        pairing.start()
     }
 
     val http: OkHttpClient by lazy {
@@ -52,6 +56,10 @@ class PhotosTvApp : Application(), SingletonImageLoader.Factory {
             // Google's frontends stall HTTP/2 requests from this client (seen on the Streamer with
             // a full session's cookies); HTTP/1.1 answers immediately.
             .protocols(listOf(Protocol.HTTP_1_1))
+            // Connections left idle for a few minutes stop answering (the network drops them
+            // without closing them), and a request on one hangs until it times out. Seen after
+            // signing in from the phone, which leaves the photos.google.com connection idle.
+            .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             // A regular browser user agent, so Google serves the normal Photos web app.
@@ -62,7 +70,7 @@ class PhotosTvApp : Application(), SingletonImageLoader.Factory {
             .build()
     }
 
-    val api by lazy { demoApi() ?: PhotosApi(http) }
+    val api by lazy { demoApi() ?: PhotosApi(http, renewSession = account::renewSession) }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
@@ -93,6 +101,7 @@ class PhotosTvApp : Application(), SingletonImageLoader.Factory {
 
     /** Forgets the Google session and everything cached for it. */
     suspend fun signOut() {
+        account.forget()
         clearWebSession()
         api.reset()
         SingletonImageLoader.get(this).run {

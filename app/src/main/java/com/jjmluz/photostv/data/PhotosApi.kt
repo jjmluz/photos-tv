@@ -25,7 +25,11 @@ import kotlin.random.Random
  * this is the only way to browse the full library. It is undocumented and may change;
  * RPC ids and response layouts follow https://github.com/xob0t/Google-Photos-Toolkit.
  */
-open class PhotosApi(private val http: OkHttpClient) {
+open class PhotosApi(
+    private val http: OkHttpClient,
+    /** Makes a new web session when the current one has ended; true if it did. */
+    private val renewSession: suspend () -> Boolean = { false },
+) {
 
     /** Per-session tokens embedded in the photos.google.com page (`WIZ_global_data`). */
     private data class PageTokens(
@@ -40,7 +44,12 @@ open class PhotosApi(private val http: OkHttpClient) {
     @Volatile private var tokens: PageTokens? = null
 
     /** Verifies the session and returns the signed-in account email (if exposed). */
-    open suspend fun connect(): String? = tokens(refresh = true).account
+    open suspend fun connect(): String? = try {
+        tokens(refresh = true).account
+    } catch (e: NotSignedInException) {
+        if (!renewSession()) throw e
+        tokens(refresh = true).account
+    }
 
     open fun reset() {
         tokens = null
@@ -120,11 +129,31 @@ open class PhotosApi(private val http: OkHttpClient) {
         tokens?.takeUnless { refresh } ?: withContext(Dispatchers.IO) { fetchTokens() }.also { tokens = it }
     }
 
+    /** For the photos.google.com page: logs each hop (sign-in redirects included) with its time. */
+    private val pageClient by lazy {
+        http.newBuilder()
+            .addNetworkInterceptor { chain ->
+                val url = chain.request().url
+                val via = chain.connection()?.let { "${it.socket().inetAddress.hostAddress} ${it.protocol()}" }
+                val start = System.nanoTime()
+                fun ms() = (System.nanoTime() - start) / 1_000_000
+                try {
+                    chain.proceed(chain.request()).also {
+                        Log.i("PhotosTV", "Photos page hop: HTTP ${it.code} from ${url.host}${url.encodedPath} in ${ms()} ms via $via")
+                    }
+                } catch (e: IOException) {
+                    Log.w("PhotosTV", "Photos page hop: ${e.message} at ${url.host}${url.encodedPath} after ${ms()} ms via $via")
+                    throw e
+                }
+            }
+            .build()
+    }
+
     private fun fetchTokens(): PageTokens {
         val request = Request.Builder().url("https://photos.google.com/").build()
         val cookieHeader = CookieManager.getInstance().getCookie("https://photos.google.com/").orEmpty()
         Log.i("PhotosTV", "Photos page: sending ${cookieHeader.count { it == '=' }} cookies, ${cookieHeader.length} bytes")
-        http.newCall(request).execute().use { response ->
+        pageClient.newCall(request).execute().use { response ->
             // Signed-out visitors are redirected to the marketing page on www.google.com.
             val finalUrl = response.request.url
             Log.i("PhotosTV", "Photos page: HTTP ${response.code} at ${finalUrl.host}${finalUrl.encodedPath}")
@@ -148,11 +177,14 @@ open class PhotosApi(private val http: OkHttpClient) {
 
     private suspend fun rpc(rpcId: String, args: JSONArray): Any? {
         var attempt = 0
+        var renewed = false
         while (true) {
             try {
                 return withContext(Dispatchers.IO) { execute(rpcId, args, tokens()) }
             } catch (e: NotSignedInException) {
-                throw e
+                if (renewed || !renewSession()) throw e
+                renewed = true
+                tokens = null
             } catch (e: IOException) {
                 if (++attempt >= 3) throw e
                 // Tokens can go stale while the app sits in the background; refetch them.

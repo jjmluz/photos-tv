@@ -14,6 +14,7 @@ import com.jjmluz.photostv.data.MediaItem
 import com.jjmluz.photostv.data.MonthIndex
 import com.jjmluz.photostv.data.NotSignedInException
 import com.jjmluz.photostv.data.Person
+import com.jjmluz.photostv.data.Profile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -58,6 +59,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var auth by mutableStateOf<AuthState>(AuthState.Checking)
         private set
 
+    /** The signed-in account, for the avatar; just the email until its name and picture arrive. */
+    var profile by mutableStateOf<Profile?>(null)
+        private set
+
     var tab by mutableStateOf(Tab.Photos)
         private set
 
@@ -94,9 +99,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         connect()
-        // A fresh session from the Chrome extension signs back in without any action on the TV.
+        // Signing in from the phone opens the library without any action on the TV.
         viewModelScope.launch {
-            app.cookieSync.received.collect {
+            app.pairing.signedIn.collect {
                 if (auth is AuthState.SignedOut || auth is AuthState.Failed) connect()
             }
         }
@@ -107,6 +112,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             auth = try {
                 AuthState.SignedIn(api.connect()).also {
+                    loadProfile(it.account)
                     photos.feed.refresh()
                     albums.refresh()
                     people.refresh()
@@ -122,9 +128,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadProfile(email: String?) {
+        profile = app.account.savedProfile ?: Profile(null, email, null)
+        viewModelScope.launch {
+            runCatching { app.account.profile() }
+                .onSuccess { if (it != null) profile = it }
+                .onFailure { Log.w(TAG, "Profile failed", it) }
+        }
+    }
+
     fun signOut() {
         viewModelScope.launch {
             app.signOut()
+            profile = null
             months.clear()
             openAlbum = null
             openPerson = null

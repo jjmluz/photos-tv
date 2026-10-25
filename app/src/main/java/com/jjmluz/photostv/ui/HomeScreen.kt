@@ -102,6 +102,11 @@ fun HomeScreen(vm: MainViewModel) {
                     }
                 }
             }
+            AccountButton(
+                vm.profile,
+                onSignOut = vm::signOut,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = PageStartPadding),
+            )
         }
         Box(Modifier.weight(1f)) {
             // Keep each tab's saveable state while it is off screen.

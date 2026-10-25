@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.IOException
@@ -29,15 +28,16 @@ import javax.crypto.spec.SecretKeySpec
 private const val TAG = "PhotosTV"
 
 /**
- * Receives the Google session from the "Fotos TV" Chrome extension over the local network, so the
- * TV keeps the browser's current cookies instead of a one-off export that Google soon retires.
+ * Receives the account sign-in token from the Fotos TV phone app over the local network (see
+ * [GoogleAccount]). The phone finds this server by scanning the QR code of [pairingUri].
  *
- * The extension POSTs `{"iv", "data"}` to `http://<tv>:[PORT]/cookies`: AES-GCM over
- * `{"sentAt", "cookies"}` (cookies in `cookies.txt` format), keyed from the pairing [code] shown on
- * the sign-in screen. Anything that doesn't decrypt with it, or is stale or replayed, is refused.
+ * The phone POSTs `{"iv", "data"}` to `http://<tv>:[PORT]/token`: AES-GCM over
+ * `{"sentAt", "email", "oauthToken"}`, keyed from the pairing [code] in the QR code. Anything that
+ * doesn't decrypt with the code, or is stale or replayed, is refused.
  */
-class CookieSync(context: Context, private val scope: CoroutineScope) {
+class PairingServer(context: Context, private val scope: CoroutineScope, private val account: GoogleAccount) {
 
+    // Named after the Chrome extension sync this replaced, so existing installs keep their code.
     private val prefs = context.getSharedPreferences("cookie_sync", Context.MODE_PRIVATE)
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 
@@ -47,12 +47,15 @@ class CookieSync(context: Context, private val scope: CoroutineScope) {
     private val key by lazy { deriveKey(code) }
     private var lastSentAt = 0L
 
-    private val _received = MutableSharedFlow<Int>(extraBufferCapacity = 1)
-    /** Emits the number of cookies applied after each accepted push. */
-    val received: SharedFlow<Int> = _received.asSharedFlow()
+    private val _signedIn = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** Emits after the phone has signed the TV in. */
+    val signedIn: SharedFlow<Unit> = _signedIn.asSharedFlow()
 
-    /** This TV's address on the local network, for the extension's settings. */
-    fun address(): String? {
+    /** What the phone app scans to pair: this TV's address and its code. */
+    fun pairingUri(): String? = address()?.let { "photostv://pair?host=$it&code=${code.filter(Char::isLetterOrDigit)}" }
+
+    /** This TV's address on the local network. */
+    private fun address(): String? {
         val props = connectivity.getLinkProperties(connectivity.activeNetwork) ?: return null
         val ip = props.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
         return ip?.hostAddress?.let { "$it:$PORT" }
@@ -66,10 +69,10 @@ class CookieSync(context: Context, private val scope: CoroutineScope) {
                     bind(InetSocketAddress(PORT))
                 }
             } catch (e: IOException) {
-                Log.w(TAG, "Cookie sync: can't listen on $PORT", e)
+                Log.w(TAG, "Pairing: can't listen on $PORT", e)
                 return@launch
             }
-            Log.i(TAG, "Cookie sync: listening on $PORT")
+            Log.i(TAG, "Pairing: listening on $PORT")
             server.use {
                 while (isActive) {
                     val socket = runCatching { server.accept() }.getOrNull() ?: continue
@@ -84,22 +87,17 @@ class CookieSync(context: Context, private val scope: CoroutineScope) {
         val (status, body) = try {
             val request = readRequest(BufferedInputStream(socket.getInputStream()))
             when {
-                request.method == "OPTIONS" -> 204 to ""
                 request.method == "GET" && request.path == "/ping" -> 200 to """{"app":"photostv"}"""
-                request.method == "POST" && request.path == "/cookies" -> accept(request.body)
+                request.method == "POST" && request.path == "/token" -> acceptToken(request.body)
                 else -> 404 to ""
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Cookie sync: bad request: ${e.message}")
+            Log.w(TAG, "Pairing: bad request: ${e.message}")
             400 to ""
         }
-        val reason = mapOf(200 to "OK", 204 to "No Content", 400 to "Bad Request", 401 to "Unauthorized", 404 to "Not Found", 409 to "Conflict")
+        val reason = mapOf(200 to "OK", 400 to "Bad Request", 401 to "Unauthorized", 404 to "Not Found", 409 to "Conflict", 502 to "Bad Gateway")
         val bytes = body.toByteArray()
         val head = "HTTP/1.1 $status ${reason[status]}\r\n" +
-            "Access-Control-Allow-Origin: *\r\n" +
-            "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
-            "Access-Control-Allow-Headers: Content-Type\r\n" +
-            "Access-Control-Allow-Private-Network: true\r\n" +
             "Content-Type: application/json\r\n" +
             "Content-Length: ${bytes.size}\r\n" +
             "Connection: close\r\n\r\n"
@@ -110,25 +108,38 @@ class CookieSync(context: Context, private val scope: CoroutineScope) {
         }
     }
 
-    private suspend fun accept(body: ByteArray): Pair<Int, String> {
+    /** Signs in with the phone's token; answers only once the TV has a web session, or why not. */
+    private suspend fun acceptToken(body: ByteArray): Pair<Int, String> {
+        val payload = try { open(body) } catch (e: Refusal) { return e.response }
+        return try {
+            account.signIn(payload.getString("email"), payload.getString("oauthToken"))
+            _signedIn.tryEmit(Unit)
+            200 to """{"email":${JSONObject.quote(account.email)}}"""
+        } catch (e: Exception) {
+            Log.w(TAG, "Pairing: phone sign-in failed", e)
+            502 to JSONObject().put("error", e.message ?: e.toString()).toString()
+        }
+    }
+
+    private class Refusal(val response: Pair<Int, String>) : Exception()
+
+    /** Decrypts a request's payload, refusing one sealed with another code, stale or replayed. */
+    private fun open(body: ByteArray): JSONObject {
         val envelope = JSONObject(String(body))
         val payload = try {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, envelope.getString("iv").fromBase64()))
             JSONObject(String(cipher.doFinal(envelope.getString("data").fromBase64())))
         } catch (e: Exception) {
-            Log.w(TAG, "Cookie sync: refused a push that doesn't match the pairing code")
-            return 401 to """{"error":"pairing"}"""
+            Log.w(TAG, "Pairing: refused a request that doesn't match the pairing code")
+            throw Refusal(401 to """{"error":"pairing"}""")
         }
         val sentAt = payload.getLong("sentAt")
         if (sentAt <= lastSentAt || kotlin.math.abs(System.currentTimeMillis() - sentAt) > MAX_AGE_MS) {
-            return 409 to """{"error":"stale"}"""
+            throw Refusal(409 to """{"error":"stale"}""")
         }
         lastSentAt = sentAt
-        val count = withContext(Dispatchers.Main) { CookieImport.apply(payload.getString("cookies")) }
-        Log.i(TAG, "Cookie sync: applied $count cookies")
-        _received.tryEmit(count)
-        return 200 to """{"cookies":$count}"""
+        return payload
     }
 
     private class Request(val method: String, val path: String, val body: ByteArray)
@@ -158,9 +169,9 @@ class CookieSync(context: Context, private val scope: CoroutineScope) {
 
     companion object {
         const val PORT = 8765
-        private const val MAX_BODY = 2 * 1024 * 1024
+        private const val MAX_BODY = 64 * 1024
         private const val MAX_AGE_MS = 10 * 60 * 1000L
-        // No 0/O or 1/I, so the code is easy to copy from the TV.
+        // No 0/O or 1/I, so the code is easy to read off the TV.
         private const val ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
         private fun newCode(): String {
@@ -168,7 +179,7 @@ class CookieSync(context: Context, private val scope: CoroutineScope) {
             return List(12) { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("").chunked(4).joinToString("-")
         }
 
-        /** PBKDF2-SHA256 over the code without dashes; the extension derives the same key. */
+        /** PBKDF2-SHA256 over the code without dashes; the phone app derives the same key. */
         private fun deriveKey(code: String): SecretKeySpec {
             val clean = code.uppercase().filter { it.isLetterOrDigit() }
             val spec = PBEKeySpec(clean.toCharArray(), "photos-tv-cookie-sync".toByteArray(), 100_000, 256)

@@ -6,6 +6,8 @@ written in pt-PT and the app forces the pt-PT locale, so dates and the video pla
 match regardless of the TV's system language.
 
 - **Tabs**: Fotos, Álbuns and Pessoas along the top; moving along them switches page
+- **Account**: your Google account picture at the top right, past the tabs; select it to see the
+  account and sign out
 - **Back**: on a list, moves focus back to its first item (the newest photo, the first album or
   person); pressed again there, it exits the app
 - **Photos**: your whole library as a timeline, grouped by day, newest first
@@ -46,12 +48,21 @@ Picker API. So this app uses the same private `batchexecute` RPC endpoint that p
 | People | `yQelMe` with `[pageToken, null, null, [[1, null, 1]]]` |
 | A person's photos | `EzkLib` (search) with `["", [[1, personId, 0, 0]], pageToken]` |
 
-Signing in is done by importing your Google web session from a desktop browser. Google blocks
-every other route for a third-party TV app: its sign-in page refuses WebViews, and the device sign-in
-flow requires a Play Services attestation (`MissingDroidguard`) that only Google's own apps can produce.
+Signing in is done from a phone. Google blocks every route on the TV itself for a third-party app:
+its normal sign-in page refuses WebViews, and the device sign-in flow requires a Play Services
+attestation (`MissingDroidguard`) that only Google's own apps can produce. The one page it does allow
+in a WebView is `accounts.google.com/EmbeddedSetup`, the sign-in of Android's setup wizard. The phone
+app shows it and sends the one-time `oauth_token` it leaves to the TV, which trades it for an Android
+master token (the flow of [gpsoauth](https://github.com/simon-weber/gpsoauth)). From the master
+token the TV makes its own web session whenever it needs one: OAuthLogin access token → uberauth →
+`MergeSession`, as Chrome on Android does.
 
 **Caveats:** the endpoint is undocumented and against Google's ToS for third-party clients. It can
 change without notice. If it does, `data/PhotosApi.kt` is the only file that should need updating.
+The sign-in endpoints are just as unofficial, and `data/GoogleAccount.kt` is where they live. The
+master token gives full access to the Google account until you change its password or remove the
+device in your account's security settings; the TV keeps it encrypted with a key in the Android
+Keystore, and signing out deletes it.
 
 ## Build
 
@@ -69,6 +80,12 @@ library with images from picsum.photos, so the UI can be tried without a Google 
 
 ```bash
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:installDebug
+```
+
+The phone app is a module of its own (Android 10 or later):
+
+```bash
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :phone:assembleRelease
 ```
 
 ## Install on the Google TV Streamer
@@ -93,30 +110,33 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 
 The app shows up under **Apps** on the Google TV home screen as **Fotos**.
 
+Install the phone app the same way, with wireless debugging on the phone, or copy
+`phone/build/outputs/apk/release/phone-release.apk` to it and open the file:
+
+```bash
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :phone:installRelease
+```
+
+It shows up as **Fotos TV**.
+
 ## Sign in
 
-The app borrows the Google session of your desktop Chrome. The **Fotos TV** extension in
-`chrome-extension/` keeps it in sync, so the TV signs itself back in whenever Google rotates the
-session cookies.
+1. Open the Fotos app on the TV. Its sign-in screen shows a QR code.
+2. On the phone, open **Fotos TV**, choose **Ler código QR** and scan it. The first time, allow the
+   app to find devices on the local network.
+3. Sign in to your Google account on the page that opens, and accept Google's terms if asked.
+4. The phone says **Sessão iniciada** and the TV opens your library.
 
-1. In Chrome, open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked** and
-   pick the `chrome-extension` folder.
-2. Open the Fotos app on the TV. Its sign-in screen shows the TV's address (e.g. `192.168.86.27:8765`)
-   and a pairing code.
-3. Click the extension's icon, enter both and choose **Guardar e sincronizar**. Chrome asks to let
-   the extension reach that address; allow it.
-4. Make sure you're signed in at [photos.google.com](https://photos.google.com) in that Chrome profile.
+The phone and the TV must be on the same network, with the Fotos app open on the TV. Nothing stays on
+the phone: it clears its cookies once the TV has answered. The TV makes a new web session by itself
+whenever Google ends the current one, so you only sign in again after signing out (select your
+picture at the top right, or press Back on the error screen) or if the master token is revoked.
 
-From then on the extension sends Chrome's Google cookies to the TV every minute, and a few seconds
-after Google rotates one. The TV only receives while the app is running: if the session ends while
-it's closed, the app opens on the sign-in screen and signs in within a minute, as long as Chrome is
-open on the computer. If the TV's address changes, enter the new one in the extension.
+The token travels encrypted (AES-GCM, with a key derived from the pairing code in the QR code), and
+the TV refuses anything that doesn't decrypt with its code, is older than 10 minutes, or repeats an
+earlier request.
 
-The cookies travel encrypted (AES-GCM, with a key derived from the pairing code), and the app refuses
-anything that doesn't decrypt with its code, is older than 10 minutes, or repeats an earlier push. Only
-`google.com` cookies are sent, and the app keeps only the ones Photos needs.
-
-### Without the extension
+### With a cookies.txt
 
 Export the cookies of photos.google.com in `cookies.txt` format (for example with *Get cookies.txt
 LOCALLY*) and, with the app on its sign-in screen, push the file:
@@ -142,15 +162,21 @@ app/src/main/java/com/jjmluz/photostv/
     MonthIndex.kt       months that have photos, for the timeline panel
     WebViewCookieJar.kt shares WebView cookies with OkHttp
     CookieImport.kt     parses cookies.txt into the cookie store
-    CookieSync.kt       receives encrypted cookies from the Chrome extension
+    GoogleAccount.kt    master token from the phone's sign-in, and web sessions made from it
+    PairingServer.kt    receives the encrypted sign-in token from the phone app
   ui/
-    SignInScreen.kt     sign-in by importing a browser session
+    SignInScreen.kt     pairing QR code for the phone app
     HomeScreen.kt       top tabs (Fotos, Álbuns, Pessoas)
+    AccountMenu.kt      account picture at the top right, and its sign-out dialog
     MediaGridView.kt    day-grouped, paged photo grid
     TimelinePanel.kt    years/months panel on the right of Fotos
     AlbumsScreen.kt     album list and album contents
     PeopleScreen.kt     people grid and a person's photos
     ViewerScreen.kt     full-screen viewer, slideshow, video player
+
+phone/src/main/java/com/jjmluz/photostv/phone/
+  MainActivity.kt       QR scan, Google's setup sign-in page, result
+  Tv.kt                 pairing link parsing and the encrypted request to the TV
 ```
 
 ## Launcher banner

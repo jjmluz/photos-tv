@@ -74,4 +74,10 @@ data class Person(
 
 data class Page<T>(val items: List<T>, val nextPageId: String?)
 
+/** The signed-in Google account, for the avatar in the top bar. */
+data class Profile(val name: String?, val email: String?, val pictureUrl: String?) {
+    /** Google account pictures take a size suffix like `=s96-c`. */
+    fun pictureUrl(px: Int) = pictureUrl?.let { "${it.substringBefore('=')}=s$px-c" }
+}
+
 class NotSignedInException : Exception("Sem sessão iniciada no Google Fotos")
