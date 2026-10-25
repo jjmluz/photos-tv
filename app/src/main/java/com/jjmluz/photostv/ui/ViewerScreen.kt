@@ -26,7 +26,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -92,6 +95,7 @@ import com.jjmluz.photostv.AppLocale
 import com.jjmluz.photostv.Viewer
 import com.jjmluz.photostv.app
 import com.jjmluz.photostv.data.BackgroundMusic
+import com.jjmluz.photostv.data.SlideshowMode
 import com.jjmluz.photostv.data.MediaItem
 import com.jjmluz.photostv.data.VideoSource
 import kotlinx.coroutines.CoroutineScope
@@ -108,6 +112,9 @@ private const val SEEK_STEP_MS = 10_000L
 private const val SEEK_FAST_MS = 30_000L
 private const val SEEK_RUN_RESET_MS = 1_200L
 private const val FULL_RES_FADE_MS = 300
+private const val DISSOLVE_MS = 700L
+/** How much the dynamic slideshow zooms each photo, in or out, over its time on screen. */
+private const val KEN_BURNS_ZOOM = 0.08f
 private val DateFormat = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy · HH:mm", AppLocale)
 
 /**
@@ -116,7 +123,8 @@ private val DateFormat = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyy
  * slideshow from a photo, back returns to the grid.
  *
  * The slideshow shows photos only, skipping videos: OK or play/pause pauses it, left/right step
- * between photos, back ends it on the photo showing.
+ * between photos, back ends it on the photo showing. In its dynamic mode the photos dissolve into
+ * each other and each one zooms slowly, in and out by turns.
  */
 @Composable
 fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onClose: (lastKey: String?) -> Unit) {
@@ -148,6 +156,8 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
     val settings = context.app.slideshowSettings
     val music = remember { BackgroundMusic(context, context.app.http, context.app.jamendo, scope) }
     DisposableEffect(music) { onDispose { music.release() } }
+    val dynamic = slideshow && settings.mode == SlideshowMode.Dynamic
+    val motion = remember { Motion { settings.seconds * 1_000L + DISSOLVE_MS } }
 
     fun go(delta: Int): Boolean {
         val next = index + delta
@@ -238,6 +248,37 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         photoIndex(index, 1)?.let { index = it } ?: photoIndex(-1, 1)?.let { index = it }
     }
 
+    // The dynamic slideshow dissolves to each new photo, or cuts to it while paused.
+    LaunchedEffect(dynamic, item?.key) {
+        if (!dynamic) return@LaunchedEffect motion.clear()
+        item?.let { motion.show(it, dissolve = !paused) }
+    }
+
+    // Its clock only runs with the slideshow, so pausing (or the menu) freezes the movement.
+    LaunchedEffect(dynamic, paused, menu) {
+        if (!dynamic || paused || menu) return@LaunchedEffect
+        var last = withFrameMillis { it }
+        while (true) {
+            withFrameMillis { now ->
+                motion.advance(now - last)
+                last = now
+            }
+        }
+    }
+
+    // The 4K layer redraws whenever the movement or the photos ready for it change.
+    LaunchedEffect(dynamic, fullRes) {
+        if (!dynamic || fullRes == null) return@LaunchedEffect
+        snapshotFlow {
+            val current = motion.current ?: return@snapshotFlow emptyList()
+            val previous = motion.previous
+            listOfNotNull(
+                previous?.let { shot -> fullRes.bitmaps[shot.item.key]?.let { SurfaceLayer(it, motion.scale(shot)) } },
+                fullRes.bitmaps[current.item.key]?.let { SurfaceLayer(it, motion.scale(current), motion.alpha) },
+            )
+        }.collect { surface.drawLayers(it) }
+    }
+
     LaunchedEffect(slideshow, paused, settings.music) {
         when {
             !slideshow -> music.stop()
@@ -325,30 +366,44 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                 if (fullRes != null && playing == null) {
                     AndroidView(
                         factory = { SurfaceView(it).apply { holder.setFixedSize(sizes.panelW, sizes.panelH); holder.addCallback(surface) } },
-                        update = { surface.bitmap = full },
+                        update = { if (!dynamic) surface.bitmap = full },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-                key(item.key) {
-                    // Over it, the thumbnail and then the 1080p image, until the 4K one is on screen. When
-                    // it was ready on arrival they're skipped; otherwise the 4K layer fades in over them.
-                    val readyOnArrival = remember { full != null }
-                    val sharp = full != null && surface.shown === full
-                    val coverAlpha by animateFloatAsState(if (sharp) 0f else 1f, tween(FULL_RES_FADE_MS), label = "cover")
-                    if (!readyOnArrival) {
-                        Box(Modifier.fillMaxSize().graphicsLayer { alpha = coverAlpha }.background(Color.Black)) {
-                            AsyncImage(
-                                model = remember(sizes) {
-                                    ImageRequest.Builder(context)
-                                        .data(item.screenUrl(sizes))
-                                        .placeholderMemoryCacheKey(item.thumbnailUrl(THUMB_PX))
-                                        .crossfade(true)
-                                        .build()
-                                },
-                                contentDescription = null,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                if (dynamic) {
+                    // Photos without their 4K version yet (or on a 1080p screen), drawn here instead.
+                    // The newer one stays on top, so it's drawn here too while the older one is.
+                    val current = motion.current
+                    val previous = motion.previous
+                    val previousHere = previous != null && fullRes?.bitmaps?.get(previous.item.key) == null
+                    if (previous != null && previousHere) {
+                        key(previous.item.key) { MotionImage(previous.item, sizes, scale = { motion.scale(previous) }) }
+                    }
+                    if (current != null && (previousHere || fullRes?.bitmaps?.get(current.item.key) == null)) {
+                        key(current.item.key) { MotionImage(current.item, sizes, scale = { motion.scale(current) }, alpha = { motion.alpha }) }
+                    }
+                } else {
+                    key(item.key) {
+                        // Over it, the thumbnail and then the 1080p image, until the 4K one is on screen. When
+                        // it was ready on arrival they're skipped; otherwise the 4K layer fades in over them.
+                        val readyOnArrival = remember { full != null }
+                        val sharp = full != null && surface.shown === full
+                        val coverAlpha by animateFloatAsState(if (sharp) 0f else 1f, tween(FULL_RES_FADE_MS), label = "cover")
+                        if (!readyOnArrival) {
+                            Box(Modifier.fillMaxSize().graphicsLayer { alpha = coverAlpha }.background(Color.Black)) {
+                                AsyncImage(
+                                    model = remember(sizes) {
+                                        ImageRequest.Builder(context)
+                                            .data(item.screenUrl(sizes))
+                                            .placeholderMemoryCacheKey(item.thumbnailUrl(THUMB_PX))
+                                            .crossfade(true)
+                                            .build()
+                                    },
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
                         }
                     }
                 }
@@ -738,19 +793,106 @@ private class FullResImages(private val context: Context, private val scope: Cor
 }
 
 /**
+ * The dynamic slideshow's movement: each photo zooms slowly, in and out by turns, over its time on
+ * screen ([zoomSpanMs], which includes fading out under the next one), and fades in over the one
+ * before. Moves only as far as [advance] says, so it stops while the slideshow is paused.
+ */
+private class Motion(private val zoomSpanMs: () -> Long) {
+    class Shot(val item: MediaItem, val zoomIn: Boolean) {
+        var elapsedMs by mutableLongStateOf(0L)
+    }
+
+    var current by mutableStateOf<Shot?>(null)
+        private set
+
+    /** The photo fading out under [current], until the dissolve ends. */
+    var previous by mutableStateOf<Shot?>(null)
+        private set
+
+    private var fade by mutableFloatStateOf(1f)
+
+    /** [current]'s opacity, easing in and out of the dissolve. */
+    val alpha get() = fade * fade * (3 - 2 * fade)
+
+    fun show(item: MediaItem, dissolve: Boolean) {
+        val last = current
+        if (last?.item?.key == item.key) return
+        current = Shot(item, zoomIn = !(last?.zoomIn ?: false))
+        previous = last?.takeIf { dissolve }
+        fade = if (previous != null) 0f else 1f
+    }
+
+    fun clear() {
+        current = null
+        previous = null
+        fade = 1f
+    }
+
+    fun advance(ms: Long) {
+        current?.let { it.elapsedMs += ms }
+        val before = previous ?: return
+        before.elapsedMs += ms
+        fade = (fade + ms.toFloat() / DISSOLVE_MS).coerceAtMost(1f)
+        if (fade >= 1f) previous = null
+    }
+
+    fun scale(shot: Shot): Float {
+        val t = (shot.elapsedMs.toFloat() / zoomSpanMs()).coerceIn(0f, 1f)
+        return 1f + KEN_BURNS_ZOOM * (if (shot.zoomIn) t else 1f - t)
+    }
+}
+
+/** A photo of the dynamic slideshow at the window's resolution, for when its 4K version isn't there. */
+@Composable
+private fun MotionImage(item: MediaItem, sizes: ViewerSizes, scale: () -> Float, alpha: () -> Float = { 1f }) {
+    val context = LocalContext.current
+    AsyncImage(
+        model = remember(sizes) {
+            ImageRequest.Builder(context)
+                .data(item.screenUrl(sizes))
+                .placeholderMemoryCacheKey(item.thumbnailUrl(THUMB_PX))
+                .build()
+        },
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.fillMaxSize().graphicsLayer {
+            val s = scale()
+            scaleX = s
+            scaleY = s
+            this.alpha = alpha()
+        },
+    )
+}
+
+/** A photo drawn into the 4K layer, fitted to the screen, then scaled about its centre. */
+private class SurfaceLayer(val bitmap: Bitmap, val scale: Float = 1f, val alpha: Float = 1f)
+
+/**
  * Draws [bitmap] into a SurfaceView sized to the panel. The TV composes that surface at its
  * native resolution, unlike the app window, which it scales up from 1080p.
  */
 private class FullResSurface : SurfaceHolder.Callback {
     private var holder: SurfaceHolder? = null
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private var layers = emptyList<SurfaceLayer>()
+    // Showing [bitmap] as it is, rather than the dynamic slideshow's layers.
+    private var still = true
 
     var bitmap: Bitmap? = null
         set(value) {
-            if (field === value && shown === value) return
+            if (still && field === value && shown === value) return
             field = value
+            still = true
+            layers = listOfNotNull(value?.let { SurfaceLayer(it) })
             draw()
         }
+
+    /** Draws [layers], bottom first, until [bitmap] is set again. */
+    fun drawLayers(layers: List<SurfaceLayer>) {
+        still = false
+        this.layers = layers
+        draw()
+    }
 
     /** What the surface shows now, once drawn. */
     var shown by mutableStateOf<Bitmap?>(null)
@@ -766,18 +908,19 @@ private class FullResSurface : SurfaceHolder.Callback {
     private fun draw() {
         val surface = holder?.surface?.takeIf { it.isValid } ?: return
         val frame = holder!!.surfaceFrame
-        val bmp = bitmap
         val canvas = surface.lockHardwareCanvas()
         canvas.drawColor(android.graphics.Color.BLACK)
-        if (bmp != null) {
-            val scale = minOf(frame.width().toFloat() / bmp.width, frame.height().toFloat() / bmp.height)
+        for (layer in layers) {
+            val bmp = layer.bitmap
+            val scale = minOf(frame.width().toFloat() / bmp.width, frame.height().toFloat() / bmp.height) * layer.scale
             val w = bmp.width * scale
             val h = bmp.height * scale
             val left = (frame.width() - w) / 2
             val top = (frame.height() - h) / 2
+            paint.alpha = (layer.alpha * 255).toInt()
             canvas.drawBitmap(bmp, null, RectF(left, top, left + w, top + h), paint)
         }
         surface.unlockCanvasAndPost(canvas)
-        shown = bmp
+        shown = if (still) bitmap else null
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.runtime.Composable
@@ -50,11 +51,12 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.jjmluz.photostv.data.SlideshowMode
 import com.jjmluz.photostv.data.SlideshowMusic
 import com.jjmluz.photostv.data.SlideshowSettings
 import com.jjmluz.photostv.data.Track
 
-private enum class MenuPage { Main, Duration, Music }
+private enum class MenuPage { Main, Duration, Mode, Music }
 
 private fun secondsLabel(seconds: Int) = "$seconds segundos"
 
@@ -122,6 +124,21 @@ fun SlideshowMenu(
                     }
                     LaunchedEffect(Unit) { focus.requestFocusSafely() }
                 }
+                MenuPage.Mode -> {
+                    PageTitle("Modo")
+                    val focus = remember { FocusRequester() }
+                    SlideshowMode.entries.forEach { mode ->
+                        val selected = mode == settings.mode
+                        OptionRow(
+                            label = mode.label,
+                            detail = mode.detail,
+                            selected = selected,
+                            onClick = { settings.mode = mode; back() },
+                            modifier = if (selected) Modifier.focusRequester(focus) else Modifier,
+                        )
+                    }
+                    LaunchedEffect(Unit) { focus.requestFocusSafely() }
+                }
                 MenuPage.Music -> {
                     PageTitle("Música de fundo")
                     val focus = remember { FocusRequester() }
@@ -137,13 +154,6 @@ fun SlideshowMenu(
                             modifier = if (selected) Modifier.focusRequester(focus) else Modifier,
                         )
                     }
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        "Música da Jamendo, com licenças Creative Commons",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
                     LaunchedEffect(Unit) { focus.requestFocusSafely() }
                 }
             }
@@ -162,6 +172,7 @@ private fun MainPage(
 ) {
     val start = remember { FocusRequester() }
     val duration = remember { FocusRequester() }
+    val mode = remember { FocusRequester() }
     val music = remember { FocusRequester() }
     PageTitle("Slideshow")
     ListItem(
@@ -181,10 +192,12 @@ private fun MainPage(
         modifier = Modifier.focusRequester(start),
     )
     SettingRow(Icons.Outlined.Timer, "Duração de cada foto", secondsLabel(settings.seconds), { onOpen(MenuPage.Duration) }, Modifier.focusRequester(duration))
+    SettingRow(Icons.Outlined.AutoAwesome, "Modo", settings.mode.label, { onOpen(MenuPage.Mode) }, Modifier.focusRequester(mode))
     SettingRow(Icons.Outlined.MusicNote, "Música de fundo", settings.music.label, { onOpen(MenuPage.Music) }, Modifier.focusRequester(music))
     LaunchedEffect(Unit) {
         when {
             returnTo == MenuPage.Duration -> duration
+            returnTo == MenuPage.Mode -> mode
             returnTo == MenuPage.Music -> music
             canStart -> start
             else -> duration

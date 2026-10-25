@@ -36,7 +36,10 @@ match regardless of the TV's system language.
   "Iniciar slideshow", how long each photo shows (3 to 30 s) and the background music. Play/pause
   on a photo starts it too. The slideshow shows photos only, skipping videos, and can't start from
   one. OK or play/pause pauses it, ◀ ▶ step between photos, Back ends it on the photo showing.
-  Leaving the app pauses it. The settings are kept between launches
+  Leaving the app pauses it. The settings are kept between launches. "Modo" picks Estático (one
+  photo after another) or Dinâmico: each photo dissolves into the next over 0.7 s and slowly zooms
+  in or out (by 8%, alternating), drawn into the 4K layer frame by frame; a photo whose 4K version
+  isn't ready yet moves at 1080p until it is
 - **Music**: "Calma" and "Alegre" stream popular instrumental tracks with those tags from
   [Jamendo](https://www.jamendo.com) (Creative Commons music), shuffled, fading in and out with the
   slideshow; the track and its artist show for a few seconds when it starts. With the music off,
