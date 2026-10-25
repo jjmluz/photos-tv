@@ -99,7 +99,7 @@ class PhotosTvApp : Application(), SingletonImageLoader.Factory {
             }
             .build()
 
-    /** Forgets the Google session and everything cached for it. */
+    /** Forgets the current account, its Google session and everything cached for it. */
     suspend fun signOut() {
         account.forget()
         clearWebSession()

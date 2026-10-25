@@ -47,9 +47,11 @@ private const val FILE_NAME = "cookies.txt"
  * the TV itself, so the account comes from the Fotos TV phone app, which pairs by scanning the QR
  * code (see [com.jjmluz.photostv.data.PairingServer] and [com.jjmluz.photostv.data.GoogleAccount]).
  * A cookies.txt pushed with adb also works, as a one-off session.
+ *
+ * When [adding], an account is already signed in and this adds another; Back returns to it.
  */
 @Composable
-fun SignInScreen(onImported: () -> Unit) {
+fun SignInScreen(onImported: () -> Unit, adding: Boolean = false) {
     val context = LocalContext.current
     val dir = remember { context.getExternalFilesDir(null)!! }
     var error by remember { mutableStateOf<String?>(null) }
@@ -92,7 +94,7 @@ fun SignInScreen(onImported: () -> Unit) {
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.weight(1f)) {
-            Text("Iniciar sessão", style = MaterialTheme.typography.displaySmall)
+            Text(if (adding) "Adicionar outra conta" else "Iniciar sessão", style = MaterialTheme.typography.displaySmall)
             Step(1, "No telemóvel, abra a app Fotos TV e leia este código.")
             Step(2, "Inicie sessão na sua conta Google. A TV fica com sessão própria e renova-a sozinha.")
             Text(
@@ -103,7 +105,11 @@ fun SignInScreen(onImported: () -> Unit) {
                 modifier = Modifier.padding(top = 12.dp),
             )
             Text(
-                error ?: if (qr != null) "À espera do telemóvel…" else "A TV não está ligada à rede.",
+                error ?: when {
+                    qr == null -> "A TV não está ligada à rede."
+                    adding -> "À espera do telemóvel… Prima Voltar para cancelar."
+                    else -> "À espera do telemóvel…"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 4.dp),

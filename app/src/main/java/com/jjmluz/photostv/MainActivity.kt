@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     when (val auth = vm.auth) {
                         AuthState.Checking -> LoadingScreen()
-                        AuthState.SignedOut -> SignInScreen(onImported = vm::connect)
+                        AuthState.SignedOut -> SignInScreen(onImported = vm::signedInWithCookies)
                         is AuthState.Failed -> {
                             MessageScreen(
                                 title = "Não foi possível aceder ao Google Fotos",
@@ -52,7 +52,10 @@ class MainActivity : ComponentActivity() {
                         }
                         is AuthState.SignedIn -> {
                             val viewer = vm.viewer
-                            if (viewer != null) {
+                            if (vm.addingAccount) {
+                                SignInScreen(onImported = vm::signedInWithCookies, adding = true)
+                                BackHandler(onBack = vm::cancelAddAccount)
+                            } else if (viewer != null) {
                                 ViewerScreen(viewer, locationOf = vm::locationOf, onClose = vm::closeViewer)
                             } else {
                                 HomeScreen(vm)

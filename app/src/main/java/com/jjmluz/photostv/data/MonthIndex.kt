@@ -17,17 +17,21 @@ import java.time.ZoneOffset
  *
  * The API has no such summary, so it is built by asking for the single newest item at or before
  * a moment, recording that item's month, and continuing from just before the month started:
- * one small request per month with photos. The result is cached between launches.
+ * one small request per month with photos. The result is cached between launches, per account.
  */
 class MonthIndex(context: Context, private val api: PhotosApi, private val scope: CoroutineScope) {
 
     private val prefs = context.getSharedPreferences("timeline", Context.MODE_PRIVATE)
-    private val _months = MutableStateFlow(cached())
+    private val _months = MutableStateFlow(emptyList<YearMonth>())
     val months: StateFlow<List<YearMonth>> = _months.asStateFlow()
     private var job: Job? = null
+    private var key = "months"
 
-    fun refresh() {
+    /** Rescans the library of [account] (null when it isn't known), showing its cached months meanwhile. */
+    fun refresh(account: String?) {
         job?.cancel()
+        key = account?.let { "months:$it" } ?: "months"
+        _months.value = cached()
         job = scope.launch {
             val cached = _months.value
             val found = ArrayList<YearMonth>()
@@ -43,7 +47,7 @@ class MonthIndex(context: Context, private val api: PhotosApi, private val scope
                     before = monthStart - item.timezoneOffsetMs - 1
                 }
                 _months.value = found
-                prefs.edit().putString("months", found.joinToString(",")).apply()
+                prefs.edit().putString(key, found.joinToString(",")).apply()
                 Log.i("PhotosTV", "Timeline: ${found.size} months with photos")
             } catch (e: CancellationException) {
                 throw e
@@ -53,12 +57,13 @@ class MonthIndex(context: Context, private val api: PhotosApi, private val scope
         }
     }
 
+    /** Forgets the months of the account last refreshed. */
     fun clear() {
         job?.cancel()
         _months.value = emptyList()
-        prefs.edit().clear().apply()
+        prefs.edit().remove(key).apply()
     }
 
     private fun cached(): List<YearMonth> =
-        prefs.getString("months", null)?.split(",")?.mapNotNull { runCatching { YearMonth.parse(it) }.getOrNull() }.orEmpty()
+        prefs.getString(key, null)?.split(",")?.mapNotNull { runCatching { YearMonth.parse(it) }.getOrNull() }.orEmpty()
 }

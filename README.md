@@ -7,7 +7,9 @@ match regardless of the TV's system language.
 
 - **Tabs**: Fotos, Álbuns and Pessoas along the top; moving along them switches page
 - **Account**: your Google account picture at the top right, past the tabs; select it to see the
-  account and sign out
+  account, switch to another account signed in on the TV, add one ("Adicionar outra conta", which
+  shows the QR code for the phone again; Back cancels) or sign out. Signing out removes only the
+  account showing, and the next one takes its place
 - **Back**: on a list, moves focus back to its first item (the newest photo, the first album or
   person); pressed again there, it exits the app
 - **Photos**: your whole library as a timeline, grouped by day, newest first
@@ -62,7 +64,8 @@ change without notice. If it does, `data/PhotosApi.kt` is the only file that sho
 The sign-in endpoints are just as unofficial, and `data/GoogleAccount.kt` is where they live. The
 master token gives full access to the Google account until you change its password or remove the
 device in your account's security settings; the TV keeps it encrypted with a key in the Android
-Keystore, and signing out deletes it.
+Keystore, and signing out deletes it. Each account added keeps its own master token; the web session
+belongs to one account at a time, so switching makes a new one from that account's token.
 
 ## Build
 

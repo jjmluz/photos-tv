@@ -38,6 +38,9 @@ private const val TAG = "PhotosTV"
  * Web cookies then come from master token → OAuthLogin access token → uberauth → MergeSession, as
  * Chrome on Android does.
  *
+ * Several accounts can be kept, each with its own master token; the web session (the WebView
+ * cookie store) belongs to one at a time, the current [email], and switching makes a new one.
+ *
  * [web] must store cookies in the WebView cookie store, where the Photos client reads them.
  */
 class GoogleAccount(context: Context, private val web: OkHttpClient) {
@@ -62,9 +65,30 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
             .joinToString("") { "%02x".format(it) }
             .also { prefs.edit().putString("androidId", it).apply() }
 
-    val email: String? get() = prefs.getString("email", null)
+    init {
+        // Installs from before multiple accounts kept one account under unsuffixed keys.
+        prefs.getString("masterToken", null)?.let { token ->
+            val email = prefs.getString("email", null)
+            prefs.edit().apply {
+                if (email != null) {
+                    putString("masterToken:$email", token)
+                    prefs.getString("name", null)?.let { putString("name:$email", it) }
+                    prefs.getString("picture", null)?.let { putString("picture:$email", it) }
+                    putString("accounts", email)
+                    putString("current", email)
+                }
+                remove("email").remove("masterToken").remove("name").remove("picture")
+            }.apply()
+        }
+    }
 
-    val hasToken: Boolean get() = prefs.contains("masterToken")
+    /** The account the web session belongs to; null for none, or a session from cookies.txt. */
+    val email: String? get() = prefs.getString("current", null)
+
+    /** Every account signed in on this TV, in the order they were added. */
+    val emails: List<String> get() = prefs.getString("accounts", null)?.split(',')?.filter { it.isNotEmpty() }.orEmpty()
+
+    val hasToken: Boolean get() = email?.let { prefs.contains("masterToken:$it") } == true
 
     /** Trades the phone's [oauthToken] for a master token, then makes a web session from it. */
     suspend fun signIn(email: String, oauthToken: String) = mutex.withLock {
@@ -79,11 +103,13 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
                 "droidguard_results" to "dummy123",
             )
             val master = reply["Token"] ?: throw IOException("A Google não devolveu um token (${reply["Error"] ?: reply.keys})")
+            val added = reply["Email"] ?: email
             prefs.edit()
-                .putString("email", reply["Email"] ?: email)
-                .putString("masterToken", seal(master))
+                .putString("accounts", (emails - added + added).joinToString(","))
+                .putString("current", added)
+                .putString("masterToken:$added", seal(master))
                 .apply()
-            Log.i(TAG, "Account: master token stored for ${reply["Email"] ?: email}")
+            Log.i(TAG, "Account: master token stored for $added")
         }
         makeWebSession()
     }
@@ -99,14 +125,27 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
             .isSuccess
     }
 
-    /** The account's name and picture as last fetched, so the avatar shows before [profile] answers. */
-    val savedProfile: Profile?
-        get() = email?.let { Profile(prefs.getString("name", null), it, prefs.getString("picture", null)) }
+    /** Makes [account], one of [emails], the current one, with a web session of its own. */
+    suspend fun switchTo(account: String) = mutex.withLock {
+        require(account in emails) { "Unknown account" }
+        prefs.edit().putString("current", account).apply()
+        Log.i(TAG, "Account: switching to $account")
+        makeWebSession()
+    }
 
-    /** Fetches the account's name and picture; null when signed in without a master token. */
+    /** The web session now comes from cookies.txt, so it belongs to none of the saved accounts. */
+    fun useCookieSession() {
+        prefs.edit().remove("current").apply()
+    }
+
+    /** [account]'s name and picture as last fetched, so its avatar shows before [profile] answers. */
+    fun savedProfile(account: String? = email): Profile? =
+        account?.let { Profile(prefs.getString("name:$it", null), it, prefs.getString("picture:$it", null)) }
+
+    /** Fetches the current account's name and picture; null when signed in without a master token. */
     suspend fun profile(): Profile? = withContext(Dispatchers.IO) {
         val email = email ?: return@withContext null
-        val master = unseal(prefs.getString("masterToken", null) ?: return@withContext null)
+        val master = unseal(prefs.getString("masterToken:$email", null) ?: return@withContext null)
         val reply = authRequest(
             "Email" to email,
             "EncryptedPasswd" to master,
@@ -123,12 +162,18 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
             JSONObject(response.body!!.string())
         }
         Profile(info.optString("name").ifEmpty { null }, email, info.optString("picture").ifEmpty { null }).also {
-            prefs.edit().putString("name", it.name).putString("picture", it.pictureUrl).apply()
+            prefs.edit().putString("name:$email", it.name).putString("picture:$email", it.pictureUrl).apply()
         }
     }
 
+    /** Removes the current account and its token; afterwards there is no current account. */
     fun forget() {
-        prefs.edit().remove("email").remove("masterToken").remove("name").remove("picture").apply()
+        val email = email ?: return
+        prefs.edit()
+            .putString("accounts", (emails - email).joinToString(","))
+            .remove("current")
+            .remove("masterToken:$email").remove("name:$email").remove("picture:$email")
+            .apply()
     }
 
     private suspend fun makeWebSession() {
@@ -144,7 +189,7 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
     /** A one-time token that MergeSession turns into web cookies. */
     private fun uberauth(): String {
         val email = email ?: throw IOException("Sem conta")
-        val master = unseal(prefs.getString("masterToken", null) ?: throw IOException("Sem token"))
+        val master = unseal(prefs.getString("masterToken:$email", null) ?: throw IOException("Sem token"))
 
         val reply = authRequest(
             "Email" to email,

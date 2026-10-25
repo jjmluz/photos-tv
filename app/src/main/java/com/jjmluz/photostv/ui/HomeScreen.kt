@@ -104,7 +104,11 @@ fun HomeScreen(vm: MainViewModel) {
             }
             AccountButton(
                 vm.profile,
+                otherAccounts = vm.otherAccounts,
+                onSwitch = vm::switchAccount,
+                onAdd = vm::addAccount,
                 onSignOut = vm::signOut,
+                takeFocus = vm.refocusAccount.also { vm.refocusAccount = false },
                 modifier = Modifier.align(Alignment.CenterEnd).padding(end = PageStartPadding),
             )
         }
