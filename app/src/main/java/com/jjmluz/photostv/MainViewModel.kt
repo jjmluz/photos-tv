@@ -234,6 +234,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         peopleFocusedKey = null
     }
 
+    /** Reloads the library from the top, so photos added since it loaded show up. */
+    fun refresh() {
+        if (auth !is AuthState.SignedIn) return
+        photos.restoreKey = null
+        photos.feed.refresh()
+        albums.refresh()
+        people.refresh()
+        openAlbum?.grid?.feed?.refresh()
+        openPerson?.grid?.feed?.refresh()
+        months.refresh(app.account.email ?: (auth as AuthState.SignedIn).account)
+    }
+
     fun select(target: Tab) {
         // Re-selecting Albums while inside an album goes back to the album list.
         if (target == Tab.Albums && tab == Tab.Albums) openAlbum = null

@@ -27,6 +27,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Icon
@@ -56,7 +61,18 @@ fun HomeScreen(vm: MainViewModel) {
     Column(Modifier.fillMaxSize()) {
         val selected = Tabs.indexOfFirst { it.tab == vm.tab }
         val requesters = remember { Tabs.map { FocusRequester() } }
-        Box(Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 20.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 28.dp, bottom = 20.dp)
+                // Nothing is above the top bar, so Up there reloads the library instead.
+                .onKeyEvent { event ->
+                    val up = event.key == Key.DirectionUp && event.type == KeyEventType.KeyDown
+                    if (up && event.nativeKeyEvent.repeatCount == 0) vm.refresh()
+                    up
+                },
+            contentAlignment = Alignment.Center,
+        ) {
             // A tonal pill holding the tabs, centred like the Google TV home screen's.
             TabRow(
                 selectedTabIndex = selected,
