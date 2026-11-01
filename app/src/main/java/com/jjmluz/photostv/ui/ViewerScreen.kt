@@ -85,6 +85,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -101,7 +102,12 @@ import com.jjmluz.photostv.data.VideoSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.format.DateTimeFormatter
 
 private const val TAG = "PhotosTV"
@@ -113,6 +119,13 @@ private const val SEEK_FAST_MS = 30_000L
 private const val SEEK_RUN_RESET_MS = 1_200L
 private const val FULL_RES_FADE_MS = 300
 private const val DISSOLVE_MS = 700L
+/** How many photos a slideshow downloads ahead of the one showing, and how many at a time. */
+private const val PRELOAD_AHEAD = 3
+private const val PARALLEL_DOWNLOADS = 2
+/** How long a slideshow holds a photo for the next one's 4K version, before settling for 1080p. */
+private const val FULL_RES_WAIT_MS = 3_000L
+/** How long a slideshow waits for a photo at all, before giving up on it and trying the next. */
+private const val READY_LIMIT_MS = 15_000L
 /** How much the dynamic slideshow zooms each photo, in or out, over its time on screen. */
 private const val KEN_BURNS_ZOOM = 0.08f
 private val DateFormat = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy · HH:mm", AppLocale)
@@ -123,8 +136,9 @@ private val DateFormat = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyy
  * slideshow from a photo, back returns to the grid.
  *
  * The slideshow shows photos only, skipping videos: OK or play/pause pauses it, left/right step
- * between photos, back ends it on the photo showing. In its dynamic mode the photos dissolve into
- * each other and each one zooms slowly, in and out by turns.
+ * between photos, back ends it on the photo showing. A photo stays until the next one is ready, so
+ * slow ones stretch the pace rather than leave the screen black. In its dynamic mode the photos
+ * dissolve into each other and each one zooms slowly, in and out by turns.
  */
 @Composable
 fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onClose: (lastKey: String?) -> Unit) {
@@ -150,7 +164,8 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
     val sizes = rememberViewerSizes()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val fullRes = remember(sizes) { if (sizes.hasFullRes) FullResImages(context, scope, sizes) else null }
+    val downloads = remember { Downloads(context, scope) }
+    val fullRes = remember(sizes) { if (sizes.hasFullRes) FullResImages(context, scope, sizes, downloads) else null }
     val surface = remember(sizes) { FullResSurface() }
     fun screenRequest(it: MediaItem) = ImageRequest.Builder(context).data(it.screenUrl(sizes)).build()
     val settings = context.app.slideshowSettings
@@ -175,6 +190,24 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         }
         return null
     }
+
+    /** The photo after [from] in a slideshow, wrapping around at the end of what has loaded so far. */
+    fun photoAfter(from: Int) = photoIndex(from, 1) ?: photoIndex(-1, 1)
+
+    /**
+     * Waits until [photo] can go on screen: in 4K, or at 1080p once 4K has taken [FULL_RES_WAIT_MS].
+     * False if neither arrives within [READY_LIMIT_MS].
+     */
+    suspend fun awaitReady(photo: MediaItem): Boolean = withTimeoutOrNull(READY_LIMIT_MS) {
+        fun sharp() = fullRes?.bitmaps?.containsKey(photo.key) == true
+        if (sharp()) return@withTimeoutOrNull true
+        val screen = SingletonImageLoader.get(context).execute(screenRequest(photo)) is SuccessResult
+        if (fullRes != null) {
+            fullRes.load(photo)
+            withTimeoutOrNull(FULL_RES_WAIT_MS) { snapshotFlow { sharp() }.first { it } }
+        }
+        screen || sharp()
+    } == true
 
     fun startSlideshow() {
         if (item == null || item.isVideo) return
@@ -208,12 +241,31 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
 
     // The photo on screen loads first; then its neighbours, one at a time so they don't take
     // its bandwidth, and moving left/right is instant. Also keeps the feed ahead of us.
-    // In a slideshow the neighbours are the photos either side, past any videos.
+    // A slideshow instead downloads the photos ahead, past any videos: every 1080p version, the
+    // fallback for a late 4K one, then the 4K versions, and only the next photo is decoded.
     LaunchedEffect(index, items.size, slideshow) {
         if (index >= items.size - 10) viewer.grid.feed.loadMore()
+        if (slideshow) {
+            val ahead = generateSequence(photoAfter(index)) { photoAfter(it) }
+                .takeWhile { it != index }
+                .take(PRELOAD_AHEAD)
+                .toList()
+            val next = ahead.firstOrNull()
+            val previous = photoIndex(index, -1)
+            val photos = ahead.map { items[it] }
+            fun urls(photo: MediaItem) = listOfNotNull(photo.screenUrl(sizes), fullRes?.let { photo.fullResUrl(sizes) })
+            downloads.retain((listOfNotNull(items.getOrNull(index)) + photos).flatMap(::urls).toSet())
+            photos.forEach { downloads.fetch(it.screenUrl(sizes)) }
+            if (fullRes != null) photos.forEach { downloads.fetch(it.fullResUrl(sizes)) }
+            val near = listOfNotNull(index, next, previous).mapNotNull { items.getOrNull(it) }
+            fullRes?.retain(near.map { it.key }.toSet())
+            near.filterNot { it.isVideo }.forEach { fullRes?.load(it) }
+            return@LaunchedEffect
+        }
+        downloads.retain(emptySet())
         val loader = SingletonImageLoader.get(context)
-        val next = (if (slideshow) photoIndex(index, 1) else null) ?: (index + 1)
-        val previous = (if (slideshow) photoIndex(index, -1) else null) ?: (index - 1)
+        val next = index + 1
+        val previous = index - 1
         fullRes?.retain(listOf(previous, index, next).mapNotNull { items.getOrNull(it)?.key }.toSet())
         listOf(index, next, previous).forEach { i ->
             val near = items.getOrNull(i) ?: return@forEach
@@ -238,20 +290,27 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         }
     }
 
-    // The timer for the photo showing, held while paused or with the menu open.
+    // The timer for the photo showing, held while paused or with the menu open. When it ends the
+    // photo stays until the next one is ready, passing over any that can't be loaded.
     val progress = remember { Animatable(0f) }
     LaunchedEffect(slideshow, paused, menu, index, settings.seconds) {
         progress.snapTo(0f)
         if (!slideshow || paused || menu) return@LaunchedEffect
         progress.animateTo(1f, tween(settings.seconds * 1_000, easing = LinearEasing))
-        // Wrap around at the end of what has loaded so far.
-        photoIndex(index, 1)?.let { index = it } ?: photoIndex(-1, 1)?.let { index = it }
+        var next = photoAfter(index)
+        while (next != null && next != index && !awaitReady(items[next])) next = photoAfter(next)
+        next?.let { index = it }
     }
 
-    // The dynamic slideshow dissolves to each new photo, or cuts to it while paused.
+    // The dynamic slideshow dissolves to each new photo, or cuts to it while paused, once it can
+    // be drawn: the one before stays until then.
     LaunchedEffect(dynamic, item?.key) {
         if (!dynamic) return@LaunchedEffect motion.clear()
-        item?.let { motion.show(it, dissolve = !paused) }
+        val photo = item ?: return@LaunchedEffect
+        if (fullRes?.bitmaps?.containsKey(photo.key) != true) {
+            withTimeoutOrNull(READY_LIMIT_MS) { SingletonImageLoader.get(context).execute(screenRequest(photo)) }
+        }
+        motion.show(photo, dissolve = !paused)
     }
 
     // Its clock only runs with the slideshow, so pausing (or the menu) freezes the movement.
@@ -270,13 +329,13 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
     LaunchedEffect(dynamic, fullRes) {
         if (!dynamic || fullRes == null) return@LaunchedEffect
         snapshotFlow {
-            val current = motion.current ?: return@snapshotFlow emptyList()
+            val current = motion.current ?: return@snapshotFlow null
             val previous = motion.previous
             listOfNotNull(
                 previous?.let { shot -> fullRes.bitmaps[shot.item.key]?.let { SurfaceLayer(it, motion.scale(shot)) } },
                 fullRes.bitmaps[current.item.key]?.let { SurfaceLayer(it, motion.scale(current), motion.alpha) },
             )
-        }.collect { surface.drawLayers(it) }
+        }.filterNotNull().collect { surface.drawLayers(it) }
     }
 
     LaunchedEffect(slideshow, paused, settings.music) {
@@ -295,6 +354,9 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         delay(SLIDESHOW_STATUS_MS)
         statusShown = false
     }
+
+    // The photo whose cover has something to show, until when the 4K layer keeps the one before.
+    var covered by remember { mutableStateOf<String?>(null) }
 
     Box(
         Modifier
@@ -366,7 +428,7 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                 if (fullRes != null && playing == null) {
                     AndroidView(
                         factory = { SurfaceView(it).apply { holder.setFixedSize(sizes.panelW, sizes.panelH); holder.addCallback(surface) } },
-                        update = { if (!dynamic) surface.bitmap = full },
+                        update = { if (!dynamic && (full != null || covered == item.key)) surface.bitmap = full },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -390,7 +452,8 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                         val sharp = full != null && surface.shown === full
                         val coverAlpha by animateFloatAsState(if (sharp) 0f else 1f, tween(FULL_RES_FADE_MS), label = "cover")
                         if (!readyOnArrival) {
-                            Box(Modifier.fillMaxSize().graphicsLayer { alpha = coverAlpha }.background(Color.Black)) {
+                            val backdrop = if (covered == item.key) Color.Black else Color.Transparent
+                            Box(Modifier.fillMaxSize().graphicsLayer { alpha = coverAlpha }.background(backdrop)) {
                                 AsyncImage(
                                     model = remember(sizes) {
                                         ImageRequest.Builder(context)
@@ -401,6 +464,7 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                                     },
                                     contentDescription = null,
                                     contentScale = ContentScale.Fit,
+                                    onState = { if (it.painter != null || it is AsyncImagePainter.State.Error) covered = item.key },
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             }
@@ -758,16 +822,58 @@ private fun videoHttp(context: Context) = context.app.http.newBuilder()
     .build()
 
 /**
+ * Images a slideshow will reach soon, downloaded into the disk cache in the order asked for. They
+ * carry on as the slideshow moves, so a photo that takes longer than a slide still finishes.
+ */
+private class Downloads(private val context: Context, private val scope: CoroutineScope) {
+    private val jobs = HashMap<String, Job>()
+    private val slots = Semaphore(PARALLEL_DOWNLOADS)
+
+    fun fetch(url: String) {
+        jobs.getOrPut(url) {
+            scope.launch {
+                // Coil always decodes what it fetches, so ask for the smallest bitmap it can make.
+                val request = ImageRequest.Builder(context)
+                    .data(url)
+                    .size(1, 1)
+                    .precision(Precision.INEXACT)
+                    .memoryCachePolicy(CachePolicy.DISABLED)
+                    .build()
+                val result = slots.withPermit { SingletonImageLoader.get(context).execute(request) }
+                // Let a later visit try again.
+                if (result !is SuccessResult) jobs.remove(url)
+            }
+        }
+    }
+
+    /** Waits for [url]'s download, if there is one. */
+    suspend fun join(url: String) {
+        jobs[url]?.join()
+    }
+
+    /** Cancels everything but [urls]. */
+    fun retain(urls: Set<String>) {
+        jobs.keys.filter { it !in urls }.forEach { jobs.remove(it)?.cancel() }
+    }
+}
+
+/**
  * Photos at the panel's native size, for the photo on screen and its neighbours. They're kept
  * here rather than in Coil's memory cache, where three 4K bitmaps would push out the thumbnails.
  */
-private class FullResImages(private val context: Context, private val scope: CoroutineScope, private val sizes: ViewerSizes) {
+private class FullResImages(
+    private val context: Context,
+    private val scope: CoroutineScope,
+    private val sizes: ViewerSizes,
+    private val downloads: Downloads,
+) {
     val bitmaps = mutableStateMapOf<String, Bitmap>()
     private val jobs = HashMap<String, Job>()
 
     fun load(item: MediaItem): Job = jobs.getOrPut(item.key) {
         scope.launch {
             val start = System.currentTimeMillis()
+            downloads.join(item.fullResUrl(sizes))
             val request = ImageRequest.Builder(context)
                 .data(item.fullResUrl(sizes))
                 .size(sizes.panelW, sizes.panelH)
