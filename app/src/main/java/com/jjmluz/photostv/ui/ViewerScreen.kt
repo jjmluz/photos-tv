@@ -961,12 +961,13 @@ private fun MotionImage(item: MediaItem, sizes: ViewerSizes, scale: () -> Float,
         },
         contentDescription = null,
         contentScale = ContentScale.Fit,
+        // The black fades in with the photo, so the one under it doesn't linger around a narrower one.
         modifier = Modifier.fillMaxSize().graphicsLayer {
             val s = scale()
             scaleX = s
             scaleY = s
             this.alpha = alpha()
-        },
+        }.background(Color.Black),
     )
 }
 
@@ -1023,8 +1024,16 @@ private class FullResSurface : SurfaceHolder.Callback {
             val h = bmp.height * scale
             val left = (frame.width() - w) / 2
             val top = (frame.height() - h) / 2
+            val rect = RectF(left, top, left + w, top + h)
             paint.alpha = (layer.alpha * 255).toInt()
-            canvas.drawBitmap(bmp, null, RectF(left, top, left + w, top + h), paint)
+            if (paint.alpha < 255) {
+                // The screen around it fades to black with it, so the photo under it doesn't linger there.
+                canvas.save()
+                canvas.clipOutRect(rect)
+                canvas.drawColor(android.graphics.Color.argb(paint.alpha, 0, 0, 0))
+                canvas.restore()
+            }
+            canvas.drawBitmap(bmp, null, rect, paint)
         }
         surface.unlockCanvasAndPost(canvas)
         shown = if (still) bitmap else null
