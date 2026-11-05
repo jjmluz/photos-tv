@@ -58,7 +58,7 @@ fun demoImages(): Interceptor? = if (!onEmulator) null else Interceptor { chain 
     val w = Regex("w(\\d+)").find(params)?.groupValues?.get(1) ?: "400"
     val h = Regex("-h(\\d+)").find(params)?.groupValues?.get(1) ?: "400"
     // Square crops stay square; everything else keeps a 3:2 landscape frame within the box.
-    val (width, height) = if ("-c" in params) w to h else w to (w.toInt() * 2 / 3).coerceAtMost(h.toInt()).toString()
+    val (width, height) = if ("-c" in params) w to h else minOf(w.toInt(), h.toInt() * 3 / 2).let { it.toString() to (it * 2 / 3).toString() }
     chain.proceed(chain.request().newBuilder().url("https://picsum.photos/seed/$seed/$width/$height".toHttpUrl()).build())
 }
 

@@ -132,7 +132,7 @@ private val DateFormat = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyy
 
 /**
  * Full-screen viewer. Left/right move between items, up/down toggle the date and place,
- * OK plays a video, holding OK (or the menu key) opens the slideshow menu, play/pause runs the
+ * OK plays a video or zooms a photo (2.5×, 5×, then back; the d-pad then moves around it), holding OK (or the menu key) opens the slideshow menu, play/pause runs the
  * slideshow from a photo, back returns to the grid.
  *
  * The slideshow shows photos only, skipping videos: OK or play/pause pauses it, left/right step
@@ -173,6 +173,13 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
     DisposableEffect(music) { onDispose { music.release() } }
     val dynamic = slideshow && settings.mode == SlideshowMode.Dynamic
     val motion = remember { Motion { settings.seconds * 1_000L + DISSOLVE_MS } }
+    val zoom = rememberPhotoZoom(item, sizes, scope)
+    // The sharp detail is drawn into the 4K layer when there is one, else into the window.
+    val detail by rememberZoomDetail(
+        item, zoom, sizes,
+        screenW = if (fullRes != null) sizes.panelW else sizes.windowW,
+        screenH = if (fullRes != null) sizes.panelH else sizes.windowH,
+    )
 
     fun go(delta: Int): Boolean {
         val next = index + delta
@@ -211,6 +218,7 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
 
     fun startSlideshow() {
         if (item == null || item.isVideo) return
+        zoom.zoomOut()
         slideshow = true
         paused = false
         status++
@@ -230,6 +238,7 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         when {
             playing != null -> playing = null
             slideshow -> slideshow = false
+            zoom.zoomed -> zoom.zoomOut()
             else -> onClose(item?.key)
         }
     }
@@ -325,6 +334,12 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
         }
     }
 
+    // The 4K layer follows the zoom frame by frame, with the sharp detail over it.
+    LaunchedEffect(zoom, fullRes) {
+        if (fullRes == null) return@LaunchedEffect
+        snapshotFlow { zoom.view to detail }.collect { (view, detail) -> surface.setZoom(view, detail) }
+    }
+
     // The 4K layer redraws whenever the movement or the photos ready for it change.
     LaunchedEffect(dynamic, fullRes) {
         if (!dynamic || fullRes == null) return@LaunchedEffect
@@ -389,12 +404,27 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                                 when {
                                     item?.isVideo == true -> playing = item
                                     slideshow -> togglePause()
+                                    item != null -> {
+                                        zoom.cycle()
+                                        overlay = false
+                                    }
                                 }
                             }
                         }
                         return@onKeyEvent true
                     }
                     if (!down) return@onKeyEvent false
+                    // Zoomed in, the d-pad moves around the photo instead.
+                    if (zoom.zoomed && !slideshow) {
+                        val held = event.nativeKeyEvent.repeatCount > 0
+                        when (event.key) {
+                            Key.DirectionRight -> { zoom.pan(1, 0, held); return@onKeyEvent true }
+                            Key.DirectionLeft -> { zoom.pan(-1, 0, held); return@onKeyEvent true }
+                            Key.DirectionUp -> { zoom.pan(0, -1, held); return@onKeyEvent true }
+                            Key.DirectionDown -> { zoom.pan(0, 1, held); return@onKeyEvent true }
+                            else -> {}
+                        }
+                    }
                     when (event.key) {
                         Key.DirectionRight -> { if (slideshow) photoIndex(index, 1)?.let { index = it } else go(1); true }
                         Key.DirectionLeft -> { if (slideshow) photoIndex(index, -1)?.let { index = it } else go(-1); true }
@@ -465,11 +495,12 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                                     contentDescription = null,
                                     contentScale = ContentScale.Fit,
                                     onState = { if (it.painter != null || it is AsyncImagePainter.State.Error) covered = item.key },
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier.fillMaxSize().zoomed { zoom.view },
                                 )
                             }
                         }
                     }
+                    if (fullRes == null) ZoomDetailImage(detail) { zoom.view }
                 }
                 if (item.isVideo) {
                     Box(
@@ -489,6 +520,14 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                     modifier = Modifier.align(Alignment.BottomStart),
                 ) {
                     InfoOverlay(item, location)
+                }
+                AnimatedVisibility(
+                    visible = zoom.zoomed && !menu,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 40.dp),
+                ) {
+                    ZoomMap(item, zoom)
                 }
                 if (slideshow && paused && !menu) {
                     SlideshowPaused(music.track)
@@ -982,6 +1021,9 @@ private class FullResSurface : SurfaceHolder.Callback {
     private var holder: SurfaceHolder? = null
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private var layers = emptyList<SurfaceLayer>()
+    // The still photo's zoom, and the sharp part of it drawn over it.
+    private var zoom: ZoomView? = null
+    private var detail: ZoomDetail? = null
     // Showing [bitmap] as it is, rather than the dynamic slideshow's layers.
     private var still = true
 
@@ -1001,6 +1043,14 @@ private class FullResSurface : SurfaceHolder.Callback {
         draw()
     }
 
+    /** Zooms the still photo to [view] (the whole photo when null), with [detail] over it. */
+    fun setZoom(view: ZoomView?, detail: ZoomDetail?) {
+        if (zoom == null && view == null) return
+        zoom = view
+        this.detail = detail
+        if (still) draw()
+    }
+
     /** What the surface shows now, once drawn. */
     var shown by mutableStateOf<Bitmap?>(null)
         private set
@@ -1017,14 +1067,17 @@ private class FullResSurface : SurfaceHolder.Callback {
         val frame = holder!!.surfaceFrame
         val canvas = surface.lockHardwareCanvas()
         canvas.drawColor(android.graphics.Color.BLACK)
+        val zoom = zoom.takeIf { still }
         for (layer in layers) {
             val bmp = layer.bitmap
-            val scale = minOf(frame.width().toFloat() / bmp.width, frame.height().toFloat() / bmp.height) * layer.scale
-            val w = bmp.width * scale
-            val h = bmp.height * scale
-            val left = (frame.width() - w) / 2
-            val top = (frame.height() - h) / 2
-            val rect = RectF(left, top, left + w, top + h)
+            val rect = zoom?.photoRect(frame.width().toFloat(), frame.height().toFloat()) ?: run {
+                val scale = minOf(frame.width().toFloat() / bmp.width, frame.height().toFloat() / bmp.height) * layer.scale
+                val w = bmp.width * scale
+                val h = bmp.height * scale
+                val left = (frame.width() - w) / 2
+                val top = (frame.height() - h) / 2
+                RectF(left, top, left + w, top + h)
+            }
             paint.alpha = (layer.alpha * 255).toInt()
             if (paint.alpha < 255) {
                 // The screen around it fades to black with it, so the photo under it doesn't linger there.
@@ -1034,6 +1087,11 @@ private class FullResSurface : SurfaceHolder.Callback {
                 canvas.restore()
             }
             canvas.drawBitmap(bmp, null, rect, paint)
+        }
+        val sharp = detail
+        if (zoom != null && sharp != null && layers.isNotEmpty()) {
+            paint.alpha = 255
+            canvas.drawBitmap(sharp.bitmap, null, zoom.map(sharp.area, frame.width().toFloat(), frame.height().toFloat()), paint)
         }
         surface.unlockCanvasAndPost(canvas)
         shown = if (still) bitmap else null

@@ -30,6 +30,13 @@ match regardless of the TV's system language.
   files and then the original upload as fallbacks. 4K originals can't be streamed: their server
   ignores byte-range requests. ◀ ▶ to browse, ▲ ▼ to show the date and place (when Google
   Photos has one), OK to play a video, Back to return to the grid.
+- **Zoom**: OK on a photo zooms to 2.5×, again to 5×, and a third time back to the whole photo.
+  Zoomed in, the d-pad moves around it (in smaller steps while held), and the bottom right shows
+  the whole photo in miniature with the part on screen outlined. The zoomed view is drawn from the
+  original photo, downloaded on the first zoom and decoded only a screen's worth at a time, so it
+  stays sharp at 5×; until that arrives, and briefly past its edges while moving, it shows the
+  photo scaled up. Back returns to the whole photo; holding OK still opens the slideshow menu.
+  Videos don't zoom
   While a video plays, a progress bar shows the time played and the length; ◀ ▶ (or rewind/fast
   forward) jump 10 s, 30 s while held, OK or play/pause pauses, and Back stops it
 - **Slideshow**: in the viewer, hold OK (or press the menu key) on a photo for a panel with
@@ -202,6 +209,7 @@ app/src/main/java/com/jjmluz/photostv/
     PeopleScreen.kt     people grid and a person's photos
     ViewerScreen.kt     full-screen viewer, slideshow, video player
     Slideshow.kt        slideshow menu (hold OK), status and paused overlays
+    Zoom.kt             photo zoom: levels, panning, sharp detail from the original, miniature
 
 phone/src/main/java/com/jjmluz/photostv/phone/
   MainActivity.kt       QR scan, Google's setup sign-in page, result
