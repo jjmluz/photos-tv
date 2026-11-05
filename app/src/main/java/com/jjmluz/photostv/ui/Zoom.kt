@@ -68,7 +68,7 @@ import kotlin.math.roundToInt
 private const val TAG = "PhotosTV"
 
 /** The zoom levels OK steps through on a photo, back to the whole photo after the last. */
-private val ZOOM_LEVELS = floatArrayOf(1f, 2.5f, 5f)
+private val ZOOM_LEVELS = floatArrayOf(1f, 2f, 5f)
 private const val ZOOM_MS = 300
 /** How far a press of the d-pad moves the view, as a fraction of what's on screen; less per repeat while held. */
 private const val PAN_STEP = 0.25f
@@ -320,8 +320,8 @@ fun ZoomDetailImage(detail: ZoomDetail?, view: () -> ZoomView?) {
 @Composable
 fun ZoomMap(item: MediaItem, zoom: PhotoZoom, modifier: Modifier = Modifier) {
     val aspect = if (item.width > 0 && item.height > 0) item.width.toFloat() / item.height else 1.5f
-    val maxW = 240.dp
-    val maxH = 150.dp
+    val maxW = 200.dp
+    val maxH = 125.dp
     val (w, h) = if (aspect >= maxW / maxH) maxW to maxW / aspect else maxH * aspect to maxH
     val shape = RoundedCornerShape(8.dp)
     Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
