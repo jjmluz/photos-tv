@@ -245,3 +245,8 @@ outlines generated from Roboto. To change one, edit and re-run the generator wit
 ```
 
 A new language whose name differs from "Photos" needs its own `drawable-<code>/banner.xml`.
+
+## License
+
+[MIT](LICENSE). The launcher banner's text is drawn from Roboto (Apache 2.0); slideshow music comes from
+Jamendo under each track's own Creative Commons license and isn't part of this repository.
