@@ -1,7 +1,9 @@
 # Photos for Google TV
 
 A Google Photos client for the Google TV Streamer (Android TV 14 / API 34), built with
-Jetpack Compose for TV (Material 3).
+Jetpack Compose for TV (Material 3). It's an unofficial, personal project, not affiliated with or
+endorsed by Google, and it relies on private Google endpoints (see
+[How it talks to Google Photos](#how-it-talks-to-google-photos)).
 
 - **Languages**: English, Portuguese (European), Spanish, French and German, picked from the TV's
   system language (or the app's own language setting, where Android offers one); any other language
@@ -39,10 +41,10 @@ Jetpack Compose for TV (Material 3).
   stays sharp at 5×; until that arrives, and briefly past its edges while moving, it shows the
   photo scaled up. Back returns to the whole photo; holding OK still opens the slideshow menu.
   Videos don't zoom
-  While a video plays, a progress bar shows the time played and the length; ◀ ▶ (or rewind/fast
+- **Video**: while a video plays, a progress bar shows the time played and the length; ◀ ▶ (or rewind/fast
   forward) jump 10 s, 30 s while held, OK or play/pause pauses, and Back stops it
 - **Slideshow**: in the viewer, hold OK (or press the menu key) on a photo for a panel with
-  "Start slideshow", how long each photo shows (3 to 30 s) and the background music. Play/pause
+  "Start slideshow", how long each photo shows (3 to 30 s), the mode and the background music. Play/pause
   on a photo starts it too. The slideshow shows photos only, skipping videos, and can't start from
   one. OK or play/pause pauses it, ◀ ▶ step between photos, Back ends it on the photo showing.
   Leaving the app pauses it. The settings are kept between launches. The next three photos are
@@ -56,7 +58,9 @@ Jetpack Compose for TV (Material 3).
   slideshow; the track and its artist show for a few seconds when it starts. With the music off,
   music already playing in another app (say Spotify) carries on under the slideshow
 
-Nothing is stored on the device except Coil's image cache (up to 768 MB on disk), which is cleared when the session ends.
+The TV keeps each account's master token (encrypted), the slideshow settings, the timeline's month list
+and Coil's image cache (up to 768 MB on disk). Signing out deletes that account's token and clears the
+image cache.
 
 ## How it talks to Google Photos
 
@@ -198,13 +202,13 @@ app/src/main/java/com/jjmluz/photostv/
     CookieImport.kt     parses cookies.txt into the cookie store
     GoogleAccount.kt    master token from the phone's sign-in, and web sessions made from it
     PairingServer.kt    receives the encrypted sign-in token from the phone app
-    SlideshowSettings.kt slideshow duration and music, kept between launches
+    SlideshowSettings.kt slideshow duration, mode and music, kept between launches
     Jamendo.kt          Jamendo API client: tracks by tag
     BackgroundMusic.kt  plays a Jamendo playlist behind the slideshow, with fades
   ui/
     SignInScreen.kt     pairing QR code for the phone app
     HomeScreen.kt       top tabs (Photos, Albums, People)
-    AccountMenu.kt      account picture at the top right, and its sign-out dialog
+    AccountMenu.kt      account picture at the top right, and its dialog: switch, add, sign out
     MediaGridView.kt    day-grouped, paged photo grid
     TimelinePanel.kt    years/months panel on the right of Photos
     AlbumsScreen.kt     album list and album contents
