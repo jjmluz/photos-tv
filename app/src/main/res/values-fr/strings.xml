@@ -11,13 +11,10 @@
     <string name="add_account">Ajouter un autre compte</string>
     <string name="sign_in_step_phone">Sur votre téléphone, ouvrez l’app Photos TV et scannez ce code.</string>
     <string name="sign_in_step_account">Connectez-vous à votre compte Google. La TV garde sa propre session et la renouvelle toute seule.</string>
-    <string name="sign_in_cookies">Vous pouvez aussi exporter vos cookies sous le nom %1$s et les envoyer avec adb push &lt;fichier&gt; %2$s</string>
     <string name="sign_in_no_network">La TV n’est pas connectée au réseau.</string>
     <string name="sign_in_waiting">En attente du téléphone…</string>
     <string name="sign_in_waiting_cancel">En attente du téléphone… Appuyez sur Retour pour annuler.</string>
     <string name="sign_in_qr">Code QR d’association</string>
-    <string name="cookies_unreadable">Impossible de lire ce fichier.</string>
-    <string name="cookies_no_session">Aucun cookie de session Google trouvé. Exportez les cookies en étant connecté à photos.google.com.</string>
 
     <!-- Compte -->
     <string name="sign_out">Se déconnecter</string>

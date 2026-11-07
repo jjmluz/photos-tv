@@ -11,13 +11,10 @@
     <string name="add_account">Weiteres Konto hinzufügen</string>
     <string name="sign_in_step_phone">Öffnen Sie auf dem Smartphone die App Fotos TV und scannen Sie diesen Code.</string>
     <string name="sign_in_step_account">Melden Sie sich in Ihrem Google-Konto an. Der Fernseher erhält eine eigene Sitzung und erneuert sie selbst.</string>
-    <string name="sign_in_cookies">Alternativ können Sie die Cookies als %1$s exportieren und mit adb push &lt;Datei&gt; %2$s senden</string>
     <string name="sign_in_no_network">Der Fernseher ist nicht mit dem Netzwerk verbunden.</string>
     <string name="sign_in_waiting">Warten auf das Smartphone…</string>
     <string name="sign_in_waiting_cancel">Warten auf das Smartphone… Zum Abbrechen „Zurück“ drücken.</string>
     <string name="sign_in_qr">QR-Code zum Koppeln</string>
-    <string name="cookies_unreadable">Diese Datei konnte nicht gelesen werden.</string>
-    <string name="cookies_no_session">Keine Google-Sitzungscookies gefunden. Exportieren Sie die Cookies, während Sie bei photos.google.com angemeldet sind.</string>
 
     <!-- Konto -->
     <string name="sign_out">Abmelden</string>

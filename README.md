@@ -190,19 +190,6 @@ The token travels encrypted (AES-GCM, with a key derived from the pairing code i
 the TV refuses anything that doesn't decrypt with its code, is older than 10 minutes, or repeats an
 earlier request.
 
-### With a cookies.txt
-
-Export the cookies of photos.google.com in `cookies.txt` format (for example with *Get cookies.txt
-LOCALLY*) and, with the app on its sign-in screen, push the file:
-
-```bash
-adb push ~/Downloads/cookies.txt /sdcard/Android/data/com.jjmluz.photostv/files/cookies.txt
-```
-
-The app imports it and deletes it. Delete your local copy too: it holds a live Google session. A
-one-off export stops working when Google rotates the session, so the app eventually returns to the
-sign-in screen.
-
 ## Project layout
 
 ```
@@ -215,7 +202,6 @@ app/src/main/java/com/jjmluz/photostv/
     Feed.kt             incremental page loading, date jumps, loading newer items
     MonthIndex.kt       months that have photos, for the timeline panel
     WebViewCookieJar.kt shares WebView cookies with OkHttp
-    CookieImport.kt     parses cookies.txt into the cookie store
     GoogleAccount.kt    master token from the phone's sign-in, and web sessions made from it
     PairingServer.kt    receives the encrypted sign-in token from the phone app
     SlideshowSettings.kt slideshow duration, mode and music, kept between launches

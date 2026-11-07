@@ -139,7 +139,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: NotSignedInException) {
                 Log.i(TAG, "connect: not signed in")
-                // A cookies.txt session ended, but accounts signed in from the phone are still here.
+                // No account is current, but accounts signed in from the phone are still here.
                 val saved = app.account.emails.firstOrNull()
                 if (app.account.email == null && saved != null) {
                     switchAccount(saved)
@@ -205,15 +205,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelAddAccount() {
         refocusAccount = true
         addingAccount = false
-    }
-
-    /** A cookies.txt was imported: its session belongs to none of the saved accounts. */
-    fun signedInWithCookies() {
-        app.account.useCookieSession()
-        addingAccount = false
-        resetLibrary()
-        api.reset()
-        connect()
     }
 
     /** Forgets what was on screen for the previous account. */

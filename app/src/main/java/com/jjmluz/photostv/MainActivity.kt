@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     when (val auth = vm.auth) {
                         AuthState.Checking -> LoadingScreen()
-                        AuthState.SignedOut -> SignInScreen(onImported = vm::signedInWithCookies)
+                        AuthState.SignedOut -> SignInScreen()
                         is AuthState.Failed -> {
                             MessageScreen(
                                 title = stringResource(R.string.auth_failed),
@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
                         is AuthState.SignedIn -> {
                             val viewer = vm.viewer
                             if (vm.addingAccount) {
-                                SignInScreen(onImported = vm::signedInWithCookies, adding = true)
+                                SignInScreen(adding = true)
                                 BackHandler(onBack = vm::cancelAddAccount)
                             } else if (viewer != null) {
                                 ViewerScreen(viewer, locationOf = vm::locationOf, onClose = vm::closeViewer)

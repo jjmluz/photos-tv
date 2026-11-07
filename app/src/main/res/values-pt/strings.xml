@@ -11,13 +11,10 @@
     <string name="add_account">Adicionar outra conta</string>
     <string name="sign_in_step_phone">No telemóvel, abra a app Fotos TV e leia este código.</string>
     <string name="sign_in_step_account">Inicie sessão na sua conta Google. A TV fica com sessão própria e renova-a sozinha.</string>
-    <string name="sign_in_cookies">Em alternativa, exporte os cookies como %1$s e envie-os com adb push &lt;ficheiro&gt; %2$s</string>
     <string name="sign_in_no_network">A TV não está ligada à rede.</string>
     <string name="sign_in_waiting">À espera do telemóvel…</string>
     <string name="sign_in_waiting_cancel">À espera do telemóvel… Prima Voltar para cancelar.</string>
     <string name="sign_in_qr">Código QR para emparelhar</string>
-    <string name="cookies_unreadable">Não foi possível ler esse ficheiro.</string>
-    <string name="cookies_no_session">Não foram encontrados cookies de sessão da Google. Exporte os cookies com a sessão iniciada em photos.google.com.</string>
 
     <!-- Conta -->
     <string name="sign_out">Terminar sessão</string>

@@ -74,7 +74,8 @@ private class DemoPhotosApi : PhotosApi(OkHttpClient()) {
             time -= random.nextLong(10, 180) * 60 * 1000L + if (random.nextInt(10) == 0) random.nextLong(1, 15) * day else 0
             MediaItem(
                 key = "demo$i",
-                baseUrl = "https://$DEMO_HOST/photo$i",
+                // The newest photo is the first one on screen; this seed picks a pleasant one.
+                baseUrl = "https://$DEMO_HOST/" + if (i == 0) "lake" else "photo$i",
                 width = 3000,
                 height = 2000,
                 timestamp = time,
@@ -85,13 +86,13 @@ private class DemoPhotosApi : PhotosApi(OkHttpClient()) {
     }
 
     private val albumList = listOf(
-        "Algarve holiday", "Christmas 2025", "Wedding", "Weekend in Porto", "Birthday",
+        "Thailand holiday", "Christmas 2025", "Wedding", "Weekend in Paris", "Birthday",
         "Hikes", "Beach", "Garden", "Trip to London", "Family",
     ).mapIndexed { i, title ->
         Album("album$i", title, "https://$DEMO_HOST/album$i", 20 + i * 13, authKey = null)
     }
 
-    private val peopleList = listOf("Sara", "Miguel", "Lili", "João", null, "Grandma", null, "Rita", "Tomás", null)
+    private val peopleList = listOf("Sarah", "Michael", "Lily", "John", "Emma", "Grandma", "Oliver", "Rachel", "Thomas", "Max")
         .mapIndexed { i, name -> Person("person$i", name, "https://$DEMO_HOST/face$i", 300 - i * 25) }
 
     private val places = listOf("Home, Salreu", "Lisboa", "Porto, Ribeira", null, "Praia da Rocha, Portimão", null)

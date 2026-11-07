@@ -1,7 +1,6 @@
 package com.jjmluz.photostv.ui
 
 import android.graphics.Bitmap
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -13,11 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,7 +20,6 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -33,54 +27,21 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jjmluz.photostv.R
 import com.jjmluz.photostv.app
-import com.jjmluz.photostv.data.CookieImport
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-
-private const val TAG = "PhotosTV"
-private const val FILE_NAME = "cookies.txt"
 
 /**
  * Sign-in from the phone. Google blocks every way for a third-party TV app to sign in to Photos on
- * the TV itself, so the account comes from the Fotos TV phone app, which pairs by scanning the QR
+ * the TV itself, so the account comes from the Photos TV phone app, which pairs by scanning the QR
  * code (see [com.jjmluz.photostv.data.PairingServer] and [com.jjmluz.photostv.data.GoogleAccount]).
- * A cookies.txt pushed with adb also works, as a one-off session.
  *
  * When [adding], an account is already signed in and this adds another; Back returns to it.
  */
 @Composable
-fun SignInScreen(onImported: () -> Unit, adding: Boolean = false) {
+fun SignInScreen(adding: Boolean = false) {
     val context = LocalContext.current
-    val res = LocalResources.current
-    val dir = remember { context.getExternalFilesDir(null)!! }
-    var error by remember { mutableStateOf<String?>(null) }
     val pairing = context.app.pairing
-
-    LaunchedEffect(Unit) {
-        val file = dir.resolve(FILE_NAME)
-        while (true) {
-            if (file.exists()) {
-                val text = withContext(Dispatchers.IO) { file.readText().also { file.delete() } }
-                Log.i(TAG, "Sign-in: found $FILE_NAME (${text.length} chars)")
-                context.app.clearWebSession()
-                val result = runCatching { CookieImport.apply(text) }
-                result.onSuccess {
-                    Log.i(TAG, "Sign-in: imported $it cookies")
-                    onImported()
-                    return@LaunchedEffect
-                }
-                error = when (val e = result.exceptionOrNull()) {
-                    is CookieImport.NoSessionCookies -> res.getString(R.string.cookies_no_session)
-                    else -> e?.message ?: res.getString(R.string.cookies_unreadable)
-                }
-            }
-            delay(1_000)
-        }
-    }
 
     Row(
         Modifier.fillMaxSize().padding(horizontal = 64.dp),
@@ -104,19 +65,13 @@ fun SignInScreen(onImported: () -> Unit, adding: Boolean = false) {
             Step(1, stringResource(R.string.sign_in_step_phone))
             Step(2, stringResource(R.string.sign_in_step_account))
             Text(
-                stringResource(R.string.sign_in_cookies, FILE_NAME, "${dir.absolutePath.replace("/storage/emulated/0", "/sdcard")}/$FILE_NAME"),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-            Text(
-                error ?: when {
+                when {
                     qr == null -> stringResource(R.string.sign_in_no_network)
                     adding -> stringResource(R.string.sign_in_waiting_cancel)
                     else -> stringResource(R.string.sign_in_waiting)
                 },
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }

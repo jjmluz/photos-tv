@@ -83,7 +83,7 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
         }
     }
 
-    /** The account the web session belongs to; null for none, or a session from cookies.txt. */
+    /** The account the web session belongs to; null for none. */
     val email: String? get() = prefs.getString("current", null)
 
     /** Every account signed in on this TV, in the order they were added. */
@@ -132,11 +132,6 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
         prefs.edit().putString("current", account).apply()
         Log.i(TAG, "Account: switching to $account")
         makeWebSession()
-    }
-
-    /** The web session now comes from cookies.txt, so it belongs to none of the saved accounts. */
-    fun useCookieSession() {
-        prefs.edit().remove("current").apply()
     }
 
     /** [account]'s name and picture as last fetched, so its avatar shows before [profile] answers. */
