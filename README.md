@@ -8,14 +8,14 @@ endorsed by Google, and it relies on private Google endpoints (see
 
 | | |
 | --- | --- |
-| ![Photos timeline, grouped by day](docs/screenshots/photos.jpg) | ![Jumping to a month from the timeline panel](docs/screenshots/timeline.jpg) |
-| **Photos**: the whole library, grouped by day | **Timeline**: jump to any month or year |
-| ![Albums](docs/screenshots/albums.jpg) | ![People](docs/screenshots/people.jpg) |
-| **Albums**: owned and shared | **People**: the faces Google Photos recognised |
-| ![Viewer with the date and place](docs/screenshots/viewer.jpg) | ![Zoomed in, with the miniature](docs/screenshots/zoom.jpg) |
-| **Viewer**: full screen, with the date and place | **Zoom**: 2× and 5×, sharp from the original |
-| ![Slideshow menu](docs/screenshots/slideshow.jpg) | |
-| **Slideshow**: duration, mode and music | |
+| ![Sign-in screen with a QR code for the phone](docs/screenshots/sign-in.jpg) | ![Photos timeline, grouped by day](docs/screenshots/photos.jpg) |
+| **Sign in**: scan the QR code with the phone app | **Photos**: the whole library, grouped by day |
+| ![Jumping to a month from the timeline panel](docs/screenshots/timeline.jpg) | ![Albums](docs/screenshots/albums.jpg) |
+| **Timeline**: jump to any month or year | **Albums**: owned and shared |
+| ![People](docs/screenshots/people.jpg) | ![Viewer with the date and place](docs/screenshots/viewer.jpg) |
+| **People**: the faces Google Photos recognised | **Viewer**: full screen, with the date and place |
+| ![Zoomed in, with the miniature](docs/screenshots/zoom.jpg) | ![Slideshow menu](docs/screenshots/slideshow.jpg) |
+| **Zoom**: 2× and 5×, sharp from the original | **Slideshow**: duration, mode and music |
 
 <sub>Screenshots from the emulator's demo library, with images from picsum.photos.</sub>
 

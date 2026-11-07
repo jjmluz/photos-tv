@@ -17,7 +17,7 @@ import kotlin.random.Random
 
 /*
  * Debug builds on an emulator show a made-up library instead of Google Photos, so the UI can be
- * tried without importing a session. Images come from picsum.photos.
+ * tried without signing in. Images come from picsum.photos.
  */
 
 private const val DEMO_HOST = "demo.invalid"
