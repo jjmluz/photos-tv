@@ -190,64 +190,6 @@ The token travels encrypted (AES-GCM, with a key derived from the pairing code i
 the TV refuses anything that doesn't decrypt with its code, is older than 10 minutes, or repeats an
 earlier request.
 
-## Project layout
-
-```
-app/src/main/java/com/jjmluz/photostv/
-  PhotosTvApp.kt        OkHttp + Coil setup, sign-out, app language
-  MainActivity.kt       auth gate and top-level navigation
-  MainViewModel.kt      feeds, tab/album/viewer state, focus restoration keys
-  data/
-    PhotosApi.kt        batchexecute client and response parsing
-    Feed.kt             incremental page loading, date jumps, loading newer items
-    MonthIndex.kt       months that have photos, for the timeline panel
-    WebViewCookieJar.kt shares WebView cookies with OkHttp
-    GoogleAccount.kt    master token from the phone's sign-in, and web sessions made from it
-    PairingServer.kt    receives the encrypted sign-in token from the phone app
-    SlideshowSettings.kt slideshow duration, mode and music, kept between launches
-    Jamendo.kt          Jamendo API client: tracks by tag
-    BackgroundMusic.kt  plays a Jamendo playlist behind the slideshow, with fades
-  ui/
-    SignInScreen.kt     pairing QR code for the phone app
-    HomeScreen.kt       top tabs (Photos, Albums, People)
-    AccountMenu.kt      account picture at the top right, and its dialog: switch, add, sign out
-    MediaGridView.kt    day-grouped, paged photo grid
-    TimelinePanel.kt    years/months panel on the right of Photos
-    AlbumsScreen.kt     album list and album contents
-    PeopleScreen.kt     people grid and a person's photos
-    ViewerScreen.kt     full-screen viewer, slideshow, video player
-    Slideshow.kt        slideshow menu (hold OK), status and paused overlays
-    Zoom.kt             photo zoom: levels, panning, sharp detail from the original, miniature
-
-phone/src/main/java/com/jjmluz/photostv/phone/
-  MainActivity.kt       QR scan, Google's setup sign-in page, result
-  Tv.kt                 pairing link parsing and the encrypted request to the TV
-```
-
-## Translations
-
-The text is in `res/values/strings.xml`, in English, which is also the fallback, with translations in
-`values-pt`, `values-es`, `values-fr` and `values-de`, for both `app` and `phone`. To add a language,
-add a `values-<code>` folder to both modules, add its code to `Translated` in `PhotosTvApp.kt`, and
-give it a launcher banner if its app name isn't "Photos" (see below).
-
-## Launcher banner
-
-The Google TV launcher shows apps as 320×180 cards: a white card with the pinwheel and the app's name,
-"Photos" (`res/drawable/banner.xml`) or "Fotos" in Portuguese, Spanish and German
-(`res/drawable-pt`, `-es`, `-de`). Vector drawables can't hold text, so the word is stored as
-outlines generated from Roboto. To change one, edit and re-run the generator with the file and the word:
-
-```bash
-"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" -Djava.awt.headless=true tools/Banner.java "/Applications/Android Studio.app/Contents/plugins/design-tools/resources/layoutlib/data/fonts/RobotoStatic-Regular.ttf" app/src/main/res/drawable/banner.xml Photos
-```
-
-```bash
-"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" -Djava.awt.headless=true tools/Banner.java "/Applications/Android Studio.app/Contents/plugins/design-tools/resources/layoutlib/data/fonts/RobotoStatic-Regular.ttf" app/src/main/res/drawable-pt/banner.xml Fotos
-```
-
-A new language whose name differs from "Photos" needs its own `drawable-<code>/banner.xml`.
-
 ## License
 
 [MIT](LICENSE). The launcher banner's text is drawn from Roboto (Apache 2.0); slideshow music comes from
