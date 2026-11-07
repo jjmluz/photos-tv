@@ -1,9 +1,23 @@
 # Photos for Google TV
 
-A Google Photos client for the Google TV Streamer (Android TV 14 / API 34), built with
-Jetpack Compose for TV (Material 3). It's an unofficial, personal project, not affiliated with or
+A Google Photos client for Android TV and Google TV devices running Android 14 or later, built with
+Jetpack Compose for TV (Material 3). It's developed and tested on the Google TV Streamer, and draws
+photos at the TV's native resolution, 4K included. It's an unofficial, personal project, not affiliated with or
 endorsed by Google, and it relies on private Google endpoints (see
 [How it talks to Google Photos](#how-it-talks-to-google-photos)).
+
+| | |
+| --- | --- |
+| ![Photos timeline, grouped by day](docs/screenshots/photos.jpg) | ![Jumping to a month from the timeline panel](docs/screenshots/timeline.jpg) |
+| **Photos**: the whole library, grouped by day | **Timeline**: jump to any month or year |
+| ![Albums](docs/screenshots/albums.jpg) | ![People](docs/screenshots/people.jpg) |
+| **Albums**: owned and shared | **People**: the faces Google Photos recognised |
+| ![Viewer with the date and place](docs/screenshots/viewer.jpg) | ![Zoomed in, with the miniature](docs/screenshots/zoom.jpg) |
+| **Viewer**: full screen, with the date and place | **Zoom**: 2× and 5×, sharp from the original |
+| ![Slideshow menu](docs/screenshots/slideshow.jpg) | |
+| **Slideshow**: duration, mode and music | |
+
+<sub>Screenshots from the emulator's demo library, with images from picsum.photos.</sub>
 
 - **Languages**: English, Portuguese (European), Spanish, French and German, picked from the TV's
   system language (or the app's own language setting, where Android offers one); any other language
@@ -126,7 +140,9 @@ The phone app is a module of its own (Android 10 or later):
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :phone:assembleRelease
 ```
 
-## Install on the Google TV Streamer
+## Install on your TV
+
+These steps are for Google TV (the menu names differ a little on other Android TV devices).
 
 1. On the TV, go to **Settings → System → About** and press **Android TV OS build** 7 times to
    unlock developer options.
