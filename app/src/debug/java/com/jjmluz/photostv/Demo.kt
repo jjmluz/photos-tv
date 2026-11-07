@@ -95,7 +95,8 @@ private class DemoPhotosApi : PhotosApi(OkHttpClient()) {
     private val peopleList = listOf("Sarah", "Michael", "Lily", "John", "Emma", "Grandma", "Oliver", "Rachel", "Thomas", "Max")
         .mapIndexed { i, name -> Person("person$i", name, "https://$DEMO_HOST/face$i", 300 - i * 25) }
 
-    private val places = listOf("Home, Salreu", "Lisboa", "Porto, Ribeira", null, "Praia da Rocha, Portimão", null)
+    // By item number, mod 6; the third is the photo shown in the README's viewer screenshot.
+    private val places = listOf("Bangkok, Thailand", "Paris, France", "Bryce Canyon, Utah", null, "London, United Kingdom", null)
 
     override suspend fun connect(): String = "demo@example.com"
 
