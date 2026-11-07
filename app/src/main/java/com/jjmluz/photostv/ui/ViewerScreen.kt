@@ -68,6 +68,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -92,7 +93,7 @@ import coil3.request.SuccessResult
 import coil3.request.crossfade
 import coil3.size.Precision
 import coil3.toBitmap
-import com.jjmluz.photostv.AppLocale
+import com.jjmluz.photostv.R
 import com.jjmluz.photostv.Viewer
 import com.jjmluz.photostv.app
 import com.jjmluz.photostv.data.BackgroundMusic
@@ -108,7 +109,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
-import java.time.format.DateTimeFormatter
 
 private const val TAG = "PhotosTV"
 private const val SLIDESHOW_STATUS_MS = 3_000L
@@ -128,7 +128,6 @@ private const val FULL_RES_WAIT_MS = 3_000L
 private const val READY_LIMIT_MS = 15_000L
 /** How much the dynamic slideshow zooms each photo, in or out, over its time on screen. */
 private const val KEN_BURNS_ZOOM = 0.08f
-private val DateFormat = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM 'de' yyyy · HH:mm", AppLocale)
 
 /**
  * Full-screen viewer. Left/right move between items, up/down toggle the date and place,
@@ -510,7 +509,7 @@ fun ViewerScreen(viewer: Viewer, locationOf: suspend (MediaItem) -> String?, onC
                             .background(ControlColor.copy(alpha = 0.9f), CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = "Reproduzir", tint = OnControlColor, modifier = Modifier.size(56.dp))
+                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.play), tint = OnControlColor, modifier = Modifier.size(56.dp))
                     }
                 }
                 AnimatedVisibility(
@@ -575,7 +574,7 @@ private fun InfoOverlay(item: MediaItem, location: String?) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(item.localDateTime.format(DateFormat).capitalized(), style = MaterialTheme.typography.titleSmall, color = Color.White)
+        Text(item.localDateTime.format(localizedFormatter("EEEEdMMMMyyyy")).capitalized() + " · " + item.localDateTime.format(localizedFormatter("jmm")), style = MaterialTheme.typography.titleSmall, color = Color.White)
         if (location != null) {
             // A tonal chip, as Material You marks secondary details.
             Row(
@@ -647,7 +646,7 @@ private fun VideoPlayer(item: MediaItem, posterUrl: String, onEnded: () -> Unit)
                     player.setMediaItem(sources[attempt].toMediaItem())
                     player.prepare()
                 } else {
-                    Toast.makeText(context, "Não é possível reproduzir este vídeo", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, R.string.video_unplayable, Toast.LENGTH_LONG).show()
                     onEnded()
                 }
             }
@@ -814,7 +813,7 @@ private fun VideoControls(position: Long, buffered: Long, duration: Long, paused
         ) {
             Icon(
                 if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                contentDescription = if (paused) "Em pausa" else "A reproduzir",
+                contentDescription = stringResource(if (paused) R.string.video_paused else R.string.video_playing),
                 tint = OnControlColor,
                 modifier = Modifier.size(28.dp),
             )

@@ -22,6 +22,9 @@ object CookieImport {
         val value: String,
     )
 
+    /** The file has no Google session cookies, e.g. it was exported while signed out. */
+    class NoSessionCookies : IllegalArgumentException("No Google session cookies")
+
     private val PhotosDomains = setOf("google.com", "photos.google.com", "accounts.google.com")
 
     private val ExpiresFormat = DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneOffset.UTC)
@@ -34,9 +37,7 @@ object CookieImport {
             val d = c.domain.trimStart('.')
             d in PhotosDomains || d.endsWith("usercontent.google.com")
         }
-        require(cookies.any { it.name == "SID" || it.name.endsWith("PSID") }) {
-            "Não foram encontrados cookies de sessão da Google. Exporte os cookies com a sessão iniciada em photos.google.com."
-        }
+        if (cookies.none { it.name == "SID" || it.name.endsWith("PSID") }) throw NoSessionCookies()
         val manager = CookieManager.getInstance()
         cookies.forEach { c ->
             val host = c.domain.trimStart('.')

@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">Fotos TV</string>
+    <string name="start_title">Iniciar sessão na TV</string>
+    <string name="start_message">Abra a app Fotos na TV e leia o código QR que aparece no ecrã.</string>
+    <string name="scan">Ler código QR</string>
+    <string name="sending">A iniciar sessão na TV…</string>
+    <string name="done_title">Sessão iniciada</string>
+    <string name="done_message">A TV tem sessão iniciada como %s. Já pode fechar esta app.</string>
+    <string name="done">Concluir</string>
+    <string name="failed_title">Não foi possível iniciar sessão</string>
+    <string name="retry">Tentar novamente</string>
+    <string name="local_network_denied">Sem acesso à rede local, a app não consegue falar com a TV. Permita o acesso a dispositivos próximos.</string>
+    <string name="not_tv_qr">Esse código QR não é o da app Fotos na TV.</string>
+    <string name="scan_failed">Não foi possível ler o código: %s</string>
+    <string name="email_title">Qual é a conta?</string>
+    <string name="email_message">Introduza o email da conta Google com que acabou de iniciar sessão.</string>
+    <string name="email_label">Email</string>
+    <string name="continue_">Continuar</string>
+    <string name="tv_no_answer">A TV não respondeu. A app Fotos está aberta e na mesma rede?</string>
+    <string name="tv_wrong_code">O código QR já não é o desta TV. Leia-o novamente.</string>
+    <string name="tv_stale">A TV recusou o envio. Confirme que a hora do telemóvel está certa.</string>
+    <string name="tv_http">A TV respondeu com HTTP %d.</string>
+</resources>

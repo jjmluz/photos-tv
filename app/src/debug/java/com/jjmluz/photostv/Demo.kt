@@ -85,16 +85,16 @@ private class DemoPhotosApi : PhotosApi(OkHttpClient()) {
     }
 
     private val albumList = listOf(
-        "Férias no Algarve", "Natal 2025", "Casamento", "Fim de semana no Porto", "Aniversário",
-        "Caminhadas", "Praia", "Jardim", "Viagem a Londres", "Família",
+        "Algarve holiday", "Christmas 2025", "Wedding", "Weekend in Porto", "Birthday",
+        "Hikes", "Beach", "Garden", "Trip to London", "Family",
     ).mapIndexed { i, title ->
         Album("album$i", title, "https://$DEMO_HOST/album$i", 20 + i * 13, authKey = null)
     }
 
-    private val peopleList = listOf("Sara", "Miguel", "Lili", "João", null, "Avó", null, "Rita", "Tomás", null)
+    private val peopleList = listOf("Sara", "Miguel", "Lili", "João", null, "Grandma", null, "Rita", "Tomás", null)
         .mapIndexed { i, name -> Person("person$i", name, "https://$DEMO_HOST/face$i", 300 - i * 25) }
 
-    private val places = listOf("Casa, Salreu", "Lisboa", "Porto, Ribeira", null, "Praia da Rocha, Portimão", null)
+    private val places = listOf("Home, Salreu", "Lisboa", "Porto, Ribeira", null, "Praia da Rocha, Portimão", null)
 
     override suspend fun connect(): String = "demo@example.com"
 

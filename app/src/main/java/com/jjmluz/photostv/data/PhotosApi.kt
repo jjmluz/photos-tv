@@ -160,15 +160,15 @@ open class PhotosApi(
             if (finalUrl.host != "photos.google.com" || finalUrl.encodedPath.startsWith("/about")) {
                 throw NotSignedInException()
             }
-            if (!response.isSuccessful) throw IOException("photos.google.com respondeu com HTTP ${response.code}")
+            if (!response.isSuccessful) throw IOException("photos.google.com answered HTTP ${response.code}")
             val html = response.body!!.string()
             fun field(name: String): String? =
                 Regex("\"$name\":\"((?:[^\"\\\\]|\\\\.)*)\"").find(html)?.groupValues?.get(1)
                     ?.let { JSONArray("[\"$it\"]").getString(0) }
             return PageTokens(
                 at = field("SNlM0e") ?: throw NotSignedInException(),
-                sid = field("FdrFJe") ?: throw IOException("Falta o f.sid na página"),
-                buildLabel = field("cfb2h") ?: throw IOException("Falta a versão da aplicação na página"),
+                sid = field("FdrFJe") ?: throw IOException("The page has no f.sid"),
+                buildLabel = field("cfb2h") ?: throw IOException("The page has no app version"),
                 path = field("eptZe") ?: "/_/PhotosUi/",
                 account = field("oPEP7c"),
             )
@@ -221,12 +221,12 @@ open class PhotosApi(
 
         http.newCall(request).execute().use { response ->
             if (response.code == 401) throw NotSignedInException()
-            if (!response.isSuccessful) throw IOException("$rpcId falhou com HTTP ${response.code}")
+            if (!response.isSuccessful) throw IOException("$rpcId failed with HTTP ${response.code}")
             val text = response.body!!.string()
             val line = text.lineSequence().firstOrNull { "wrb.fr" in it }
-                ?: throw IOException("$rpcId: resposta inesperada")
+                ?: throw IOException("$rpcId: unexpected reply")
             val payload = JSONArray(line).at(0).at(2).str()
-                ?: throw IOException("$rpcId: resposta vazia")
+                ?: throw IOException("$rpcId: empty reply")
             return JSONTokener(payload).nextValue()
         }
     }

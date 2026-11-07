@@ -28,13 +28,30 @@ import com.jjmluz.photostv.data.WebViewCookieJar
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import android.content.res.Configuration
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
-/** The app is Portuguese-only (European Portuguese), regardless of the TV's system language. */
-val AppLocale: Locale = Locale.forLanguageTag("pt-PT")
+/** The languages the app is translated into (its `res/values-*` folders); English is the default. */
+private val Translated = setOf("en", "pt", "es", "fr", "de")
+
+/**
+ * The app's language: the first of the TV's languages it's translated into, or English. Dates,
+ * month names, the video player's controls and Google's place names all follow it.
+ */
+var AppLocale: Locale = Locale.ENGLISH
+    private set
+
+/** Picks [AppLocale] from [config]'s languages (the system's, or the one chosen for this app). */
+fun pickAppLocale(config: Configuration): Locale {
+    val locales = config.locales
+    val locale = (0 until locales.size()).map(locales::get).firstOrNull { it.language in Translated } ?: Locale.ENGLISH
+    AppLocale = locale
+    Locale.setDefault(locale)
+    return locale
+}
 
 class PhotosTvApp : Application(), SingletonImageLoader.Factory {
 
@@ -47,7 +64,7 @@ class PhotosTvApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
-        Locale.setDefault(AppLocale)
+        pickAppLocale(resources.configuration)
         pairing.start()
     }
 

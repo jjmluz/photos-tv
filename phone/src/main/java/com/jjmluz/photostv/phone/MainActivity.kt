@@ -45,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -58,6 +59,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -91,7 +93,7 @@ class MainActivity : ComponentActivity() {
         Log.i(TAG, "Local network permission: ${if (granted) "granted" else "denied"}")
         val next = afterPermission
         afterPermission = null
-        if (granted) next?.invoke() else step = Step.Failed("Sem acesso à rede local, a app não consegue falar com a TV. Permita o acesso a dispositivos próximos.")
+        if (granted) next?.invoke() else step = Step.Failed(getString(R.string.local_network_denied))
     }
 
     /** Runs [then] once the app may connect to the TV over the home network. */
@@ -136,7 +138,7 @@ class MainActivity : ComponentActivity() {
                     .onSuccess { Log.i(TAG, "TV signed in") }
                     .getOrElse {
                         Log.w(TAG, "Send failed", it)
-                        Step.Failed(listOfNotNull(it.message, it.cause?.toString()).joinToString("\n\n"))
+                        Step.Failed(listOfNotNull((it as? TvException)?.message(this@MainActivity) ?: it.message, it.cause?.toString()).joinToString("\n\n"))
                     }
                 clearCookies()
             }
@@ -144,9 +146,9 @@ class MainActivity : ComponentActivity() {
 
         when (val s = step) {
             Step.Start -> Message(
-                "Iniciar sessão na TV",
-                "Abra a app Fotos na TV e leia o código QR que aparece no ecrã.",
-                "Ler código QR",
+                stringResource(R.string.start_title),
+                stringResource(R.string.start_message),
+                stringResource(R.string.scan),
             ) { withLocalNetwork(::scan) }
             is Step.SignIn -> {
                 SignInPage(onToken = { token, email ->
@@ -161,10 +163,10 @@ class MainActivity : ComponentActivity() {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 CircularProgressIndicator()
-                Text("A iniciar sessão na TV…", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.sending), style = MaterialTheme.typography.titleMedium)
             }
-            is Step.Done -> Message("Sessão iniciada", "A TV tem sessão iniciada como ${s.email}. Já pode fechar esta app.", "Concluir") { finish() }
-            is Step.Failed -> Message("Não foi possível iniciar sessão", s.message, "Tentar novamente") { step = Step.Start }
+            is Step.Done -> Message(stringResource(R.string.done_title), stringResource(R.string.done_message, s.email), stringResource(R.string.done)) { finish() }
+            is Step.Failed -> Message(stringResource(R.string.failed_title), s.message, stringResource(R.string.retry)) { step = Step.Start }
         }
     }
 
@@ -174,9 +176,9 @@ class MainActivity : ComponentActivity() {
             .addOnSuccessListener { barcode ->
                 val tv = barcode.rawValue?.let(Tv::parse)
                 Log.i(TAG, "Scanned ${if (tv != null) "TV at ${tv.host}" else "another QR code"}")
-                step = if (tv != null) Step.SignIn(tv) else Step.Failed("Esse código QR não é o da app Fotos na TV.")
+                step = if (tv != null) Step.SignIn(tv) else Step.Failed(getString(R.string.not_tv_qr))
             }
-            .addOnFailureListener { step = Step.Failed("Não foi possível ler o código: ${it.message}") }
+            .addOnFailureListener { step = Step.Failed(getString(R.string.scan_failed, it.message)) }
     }
 
     /**
@@ -238,7 +240,7 @@ class MainActivity : ComponentActivity() {
                             if (request.isForMainFrame) Log.w(TAG, "Sign-in page: HTTP ${response.statusCode} at ${request.url.host}${request.url.path}")
                         }
                     }
-                    loadUrl("https://accounts.google.com/EmbeddedSetup?hl=pt-PT")
+                    loadUrl("https://accounts.google.com/EmbeddedSetup?hl=${Locale.getDefault().toLanguageTag()}")
                     webView = this
                 }
             },
@@ -290,9 +292,9 @@ private fun EmailForm(onDone: (String) -> Unit) {
         Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
-        Text("Qual é a conta?", style = MaterialTheme.typography.headlineSmall)
-        Text("Introduza o email da conta Google com que acabou de iniciar sessão.", style = MaterialTheme.typography.bodyLarge)
-        OutlinedTextField(email, { email = it.trim() }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextButton(onClick = { onDone(email) }, enabled = '@' in email, modifier = Modifier.align(Alignment.End)) { Text("Continuar") }
+        Text(stringResource(R.string.email_title), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.email_message), style = MaterialTheme.typography.bodyLarge)
+        OutlinedTextField(email, { email = it.trim() }, label = { Text(stringResource(R.string.email_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextButton(onClick = { onDone(email) }, enabled = '@' in email, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.continue_)) }
     }
 }

@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,6 +33,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jjmluz.photostv.MainViewModel
+import com.jjmluz.photostv.R
 import com.jjmluz.photostv.data.Album
 
 @Composable
@@ -66,7 +69,7 @@ private fun AlbumList(vm: MainViewModel) {
     if (state.items.isEmpty()) {
         when {
             state.error != null -> FeedError(state.error!!, feed::refresh, vm::signOut)
-            state.endReached -> MessageScreen("Sem álbuns", "Os álbuns que criar no Google Fotos aparecem aqui.", icon = Icons.Outlined.PhotoAlbum)
+            state.endReached -> MessageScreen(stringResource(R.string.albums_empty), stringResource(R.string.albums_empty_message), icon = Icons.Outlined.PhotoAlbum)
             else -> LoadingScreen()
         }
         return
@@ -128,7 +131,7 @@ private fun AlbumCard(album: Album, onClick: () -> Unit, modifier: Modifier = Mo
             },
         )
         Text(
-            album.title.ifBlank { "Sem título" },
+            album.title.ifBlank { stringResource(R.string.album_untitled) },
             style = MaterialTheme.typography.titleSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -142,4 +145,5 @@ private fun AlbumCard(album: Album, onClick: () -> Unit, modifier: Modifier = Mo
     }
 }
 
-private fun itemCount(n: Int) = if (n == 1) "1 item" else "$n itens"
+@Composable
+private fun itemCount(n: Int) = pluralStringResource(R.plurals.item_count, n, n)

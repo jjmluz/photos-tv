@@ -1,5 +1,6 @@
 package com.jjmluz.photostv.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Icon
@@ -42,18 +44,19 @@ import androidx.tv.material3.TabRow
 import androidx.tv.material3.TabRowDefaults
 import androidx.tv.material3.Text
 import com.jjmluz.photostv.MainViewModel
+import com.jjmluz.photostv.R
 import com.jjmluz.photostv.Tab
 import java.time.YearMonth
 
 /** Left margin shared by the tab row and the pages below it. */
 val PageStartPadding = 48.dp
 
-private class TabEntry(val tab: Tab, val label: String, val icon: ImageVector)
+private class TabEntry(val tab: Tab, @StringRes val label: Int, val icon: ImageVector)
 
 private val Tabs = listOf(
-    TabEntry(Tab.Photos, "Fotos", Icons.Outlined.Photo),
-    TabEntry(Tab.Albums, "Álbuns", Icons.Outlined.PhotoAlbum),
-    TabEntry(Tab.People, "Pessoas", Icons.Outlined.People),
+    TabEntry(Tab.Photos, R.string.tab_photos, Icons.Outlined.Photo),
+    TabEntry(Tab.Albums, R.string.tab_albums, Icons.Outlined.PhotoAlbum),
+    TabEntry(Tab.People, R.string.tab_people, Icons.Outlined.People),
 )
 
 @Composable
@@ -113,7 +116,7 @@ fun HomeScreen(vm: MainViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Icon(entry.icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Text(entry.label, style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(entry.label), style = MaterialTheme.typography.titleSmall)
                         }
                     }
                 }

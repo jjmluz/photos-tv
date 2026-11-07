@@ -1,3 +1,23 @@
 <resources>
-    <string name="app_name">Fotos TV</string>
+    <string name="app_name">Photos TV</string>
+    <string name="start_title">Sign in on the TV</string>
+    <string name="start_message">Open the Photos app on the TV and scan the QR code on the screen.</string>
+    <string name="scan">Scan QR code</string>
+    <string name="sending">Signing in on the TV…</string>
+    <string name="done_title">Signed in</string>
+    <string name="done_message">The TV is signed in as %s. You can close this app now.</string>
+    <string name="done">Done</string>
+    <string name="failed_title">Couldn’t sign in</string>
+    <string name="retry">Try again</string>
+    <string name="local_network_denied">Without access to the local network, the app can’t reach the TV. Allow access to nearby devices.</string>
+    <string name="not_tv_qr">That QR code isn’t the one from the Photos app on the TV.</string>
+    <string name="scan_failed">Couldn’t read the code: %s</string>
+    <string name="email_title">Which account?</string>
+    <string name="email_message">Enter the email of the Google account you just signed in with.</string>
+    <string name="email_label">Email</string>
+    <string name="continue_">Continue</string>
+    <string name="tv_no_answer">The TV didn’t answer. Is the Photos app open and on the same network?</string>
+    <string name="tv_wrong_code">The QR code no longer matches this TV. Scan it again.</string>
+    <string name="tv_stale">The TV refused the request. Check that the phone’s clock is right.</string>
+    <string name="tv_http">The TV answered with HTTP %d.</string>
 </resources>

@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -22,9 +23,10 @@ import com.jjmluz.photostv.ui.theme.PhotosTvTheme
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
 
-    // Resources (including the video player's controls) follow the app language, not the TV's.
+    // Resources (including the video player's controls) follow the app's language, which is English
+    // when the TV's isn't one the app is translated into.
     override fun attachBaseContext(newBase: Context) {
-        val config = Configuration(newBase.resources.configuration).apply { setLocale(AppLocale) }
+        val config = Configuration(newBase.resources.configuration).apply { setLocale(pickAppLocale(this)) }
         super.attachBaseContext(newBase.createConfigurationContext(config))
     }
 
@@ -42,10 +44,10 @@ class MainActivity : ComponentActivity() {
                         AuthState.SignedOut -> SignInScreen(onImported = vm::signedInWithCookies)
                         is AuthState.Failed -> {
                             MessageScreen(
-                                title = "Não foi possível aceder ao Google Fotos",
+                                title = stringResource(R.string.auth_failed),
                                 message = (auth.error.message ?: auth.error.toString()) +
-                                    "\n\nPrima Voltar para iniciar sessão novamente.",
-                                action = "Tentar novamente",
+                                    "\n\n" + stringResource(R.string.auth_failed_back),
+                                action = stringResource(R.string.retry),
                                 onAction = vm::connect,
                             )
                             BackHandler(onBack = vm::signOut)

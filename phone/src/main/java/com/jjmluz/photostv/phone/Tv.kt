@@ -1,6 +1,8 @@
 package com.jjmluz.photostv.phone
 
+import android.content.Context
 import android.net.Uri
+import androidx.annotation.StringRes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -47,15 +49,15 @@ data class Tv(val host: String, val code: String) {
         val response = try {
             http.newCall(request).execute()
         } catch (e: IOException) {
-            throw IOException("A TV não respondeu. A app Fotos está aberta e na mesma rede?", e)
+            throw TvException(R.string.tv_no_answer, cause = e)
         }
         response.use {
             val body = it.body?.string().orEmpty()
             when (it.code) {
                 200 -> JSONObject(body).optString("email", email)
-                401 -> throw IOException("O código QR já não é o desta TV. Leia-o novamente.")
-                409 -> throw IOException("A TV recusou o envio. Confirme que a hora do telemóvel está certa.")
-                else -> throw IOException(runCatching { JSONObject(body).getString("error") }.getOrNull() ?: "A TV respondeu com HTTP ${it.code}.")
+                401 -> throw TvException(R.string.tv_wrong_code)
+                409 -> throw TvException(R.string.tv_stale)
+                else -> throw runCatching { IOException(JSONObject(body).getString("error")) }.getOrNull() ?: TvException(R.string.tv_http, it.code)
             }
         }
     }
@@ -71,4 +73,9 @@ data class Tv(val host: String, val code: String) {
         val b64 = Base64.getEncoder()
         return JSONObject().put("iv", b64.encodeToString(iv)).put("data", b64.encodeToString(data)).toString()
     }
+}
+
+/** A failure talking to the TV, explained in the app's language by [message]. */
+class TvException(@StringRes private val res: Int, private vararg val args: Any, cause: Throwable? = null) : IOException(cause) {
+    fun message(context: Context): String = context.getString(res, *args)
 }

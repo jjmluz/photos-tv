@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
 import android.webkit.CookieManager
+import com.jjmluz.photostv.AppLocale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -102,7 +103,7 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
                 "callerSig" to CLIENT_SIG,
                 "droidguard_results" to "dummy123",
             )
-            val master = reply["Token"] ?: throw IOException("A Google não devolveu um token (${reply["Error"] ?: reply.keys})")
+            val master = reply["Token"] ?: throw IOException("Google returned no token (${reply["Error"] ?: reply.keys})")
             val added = reply["Email"] ?: email
             prefs.edit()
                 .putString("accounts", (emails - added + added).joinToString(","))
@@ -152,7 +153,7 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
             "service" to "oauth2:https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
             "app" to "com.android.chrome",
         )
-        val access = reply["Auth"] ?: throw IOException("A Google recusou o pedido do perfil (${reply["Error"] ?: reply.keys})")
+        val access = reply["Auth"] ?: throw IOException("Google refused the profile request (${reply["Error"] ?: reply.keys})")
         val request = Request.Builder()
             .url("https://www.googleapis.com/oauth2/v3/userinfo")
             .header("Authorization", "Bearer $access")
@@ -188,8 +189,8 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
 
     /** A one-time token that MergeSession turns into web cookies. */
     private fun uberauth(): String {
-        val email = email ?: throw IOException("Sem conta")
-        val master = unseal(prefs.getString("masterToken:$email", null) ?: throw IOException("Sem token"))
+        val email = email ?: throw IOException("No account")
+        val master = unseal(prefs.getString("masterToken:$email", null) ?: throw IOException("No token"))
 
         val reply = authRequest(
             "Email" to email,
@@ -199,7 +200,7 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
         )
         val access = reply["Auth"] ?: run {
             if (reply["Error"] == "BadAuthentication") forget()
-            throw IOException("A Google recusou o token da conta (${reply["Error"] ?: reply.keys})")
+            throw IOException("Google refused the account token (${reply["Error"] ?: reply.keys})")
         }
 
         return web.newCall(
@@ -234,7 +235,7 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
         }
         CookieManager.getInstance().flush()
         val cookies = CookieManager.getInstance().getCookie("https://photos.google.com/").orEmpty()
-        if ("SID=" !in cookies) throw IOException("MergeSession não criou a sessão")
+        if ("SID=" !in cookies) throw IOException("MergeSession made no session")
         Log.i(TAG, "Account: web session made (${cookies.count { it == '=' }} cookies)")
     }
 
@@ -248,7 +249,7 @@ class GoogleAccount(context: Context, private val web: OkHttpClient) {
             add("client_sig", CLIENT_SIG)
             add("device_country", "pt")
             add("operatorCountry", "pt")
-            add("lang", "pt_PT")
+            add("lang", AppLocale.toString())
             add("sdk_version", "34")
             fields.forEach { (k, v) -> add(k, v) }
         }.build()

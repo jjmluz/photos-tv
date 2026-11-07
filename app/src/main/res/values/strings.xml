@@ -1,3 +1,94 @@
 <resources>
-    <string name="app_name">Fotos</string>
+    <string name="app_name">Photos</string>
+
+    <!-- Tabs -->
+    <string name="tab_photos">Photos</string>
+    <string name="tab_albums">Albums</string>
+    <string name="tab_people">People</string>
+
+    <!-- Sign-in -->
+    <string name="sign_in">Sign in</string>
+    <string name="add_account">Add another account</string>
+    <string name="sign_in_step_phone">On your phone, open the Photos TV app and scan this code.</string>
+    <string name="sign_in_step_account">Sign in to your Google account. The TV keeps a session of its own and renews it by itself.</string>
+    <string name="sign_in_cookies">Alternatively, export your cookies as %1$s and send them with adb push &lt;file&gt; %2$s</string>
+    <string name="sign_in_no_network">The TV isn’t connected to the network.</string>
+    <string name="sign_in_waiting">Waiting for the phone…</string>
+    <string name="sign_in_waiting_cancel">Waiting for the phone… Press Back to cancel.</string>
+    <string name="sign_in_qr">QR code for pairing</string>
+    <string name="cookies_unreadable">Couldn’t read that file.</string>
+    <string name="cookies_no_session">No Google session cookies were found. Export the cookies while signed in to photos.google.com.</string>
+
+    <!-- Account -->
+    <string name="sign_out">Sign out</string>
+    <string name="google_account">Google account</string>
+
+    <!-- Errors and empty pages -->
+    <string name="auth_failed">Couldn’t reach Google Photos</string>
+    <string name="auth_failed_back">Press Back to sign in again.</string>
+    <string name="retry">Try again</string>
+    <string name="session_expired">Your session has expired</string>
+    <string name="session_expired_message">Sign in to Google Photos again.</string>
+    <string name="load_failed">Couldn’t load</string>
+    <string name="photos_empty">Nothing here yet</string>
+    <string name="photos_empty_message">The photos and videos in your backup show up here.</string>
+    <string name="albums_empty">No albums</string>
+    <string name="albums_empty_message">The albums you create in Google Photos show up here.</string>
+    <string name="album_untitled">Untitled</string>
+    <string name="people_empty">No people</string>
+    <string name="people_empty_message">The people and pets Google Photos recognises show up here.</string>
+    <string name="person_unnamed">No name</string>
+    <plurals name="item_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+
+    <!-- Timeline -->
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+
+    <!-- Viewer -->
+    <string name="play">Play</string>
+    <string name="video_paused">Paused</string>
+    <string name="video_playing">Playing</string>
+    <string name="video_unplayable">Can’t play this video</string>
+
+    <!-- Slideshow -->
+    <string name="slideshow">Slideshow</string>
+    <string name="slideshow_start">Start slideshow</string>
+    <string name="slideshow_resume">Resume slideshow</string>
+    <string name="slideshow_from_here">From this photo</string>
+    <string name="slideshow_pick_photo">Pick a photo: videos are left out</string>
+    <string name="slideshow_duration">Time on each photo</string>
+    <plurals name="slideshow_seconds">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
+    <string name="slideshow_mode">Mode</string>
+    <string name="slideshow_music">Background music</string>
+    <string name="slideshow_music_needs_key">Needs a Jamendo key</string>
+    <string name="slideshow_status">Slideshow · %d s per photo</string>
+    <string name="slideshow_paused">Slideshow paused</string>
+    <string name="music_load_failed">Couldn’t load the music</string>
+
+    <string name="mode_static">Static</string>
+    <string name="mode_static_detail">One photo at a time, without movement</string>
+    <string name="mode_dynamic">Dynamic</string>
+    <string name="mode_dynamic_detail">Smooth transitions and a slow zoom on each photo</string>
+
+    <string name="music_off">Off</string>
+    <string name="music_off_detail">Music playing in another app carries on</string>
+    <string name="music_calm">Calm</string>
+    <string name="music_calm_detail">Gentle instrumentals</string>
+    <string name="music_happy">Upbeat</string>
+    <string name="music_happy_detail">Lively instrumentals</string>
+
+    <!-- Remote keys and what they do -->
+    <string name="key_back">Back</string>
+    <string name="key_ok_held">Hold OK</string>
+    <string name="hint_pause">pause</string>
+    <string name="hint_end">end</string>
+    <string name="hint_resume">resume</string>
+    <string name="hint_prev_next">previous / next photo</string>
+    <string name="hint_options">options</string>
 </resources>

@@ -45,12 +45,15 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.jjmluz.photostv.R
 import com.jjmluz.photostv.data.SlideshowMode
 import com.jjmluz.photostv.data.SlideshowMusic
 import com.jjmluz.photostv.data.SlideshowSettings
@@ -58,7 +61,8 @@ import com.jjmluz.photostv.data.Track
 
 private enum class MenuPage { Main, Duration, Mode, Music }
 
-private fun secondsLabel(seconds: Int) = "$seconds segundos"
+@Composable
+private fun secondsLabel(seconds: Int) = pluralStringResource(R.plurals.slideshow_seconds, seconds, seconds)
 
 /**
  * The viewer's options, a panel on the right opened by holding OK: start the slideshow, and pick
@@ -111,7 +115,7 @@ fun SlideshowMenu(
             when (page) {
                 MenuPage.Main -> MainPage(settings, canStart, running, returnTo, onStart, ::open)
                 MenuPage.Duration -> {
-                    PageTitle("Duração de cada foto")
+                    PageTitle(stringResource(R.string.slideshow_duration))
                     val focus = remember { FocusRequester() }
                     SlideshowSettings.Durations.forEach { seconds ->
                         val selected = seconds == settings.seconds
@@ -125,13 +129,13 @@ fun SlideshowMenu(
                     LaunchedEffect(Unit) { focus.requestFocusSafely() }
                 }
                 MenuPage.Mode -> {
-                    PageTitle("Modo")
+                    PageTitle(stringResource(R.string.slideshow_mode))
                     val focus = remember { FocusRequester() }
                     SlideshowMode.entries.forEach { mode ->
                         val selected = mode == settings.mode
                         OptionRow(
-                            label = mode.label,
-                            detail = mode.detail,
+                            label = stringResource(mode.label),
+                            detail = stringResource(mode.detail),
                             selected = selected,
                             onClick = { settings.mode = mode; back() },
                             modifier = if (selected) Modifier.focusRequester(focus) else Modifier,
@@ -140,14 +144,14 @@ fun SlideshowMenu(
                     LaunchedEffect(Unit) { focus.requestFocusSafely() }
                 }
                 MenuPage.Music -> {
-                    PageTitle("Música de fundo")
+                    PageTitle(stringResource(R.string.slideshow_music))
                     val focus = remember { FocusRequester() }
                     SlideshowMusic.entries.forEach { music ->
                         val selected = music == settings.music
                         val enabled = music.tag == null || musicAvailable
                         OptionRow(
-                            label = music.label,
-                            detail = if (enabled) music.detail else "Precisa de uma chave da Jamendo",
+                            label = stringResource(music.label),
+                            detail = stringResource(if (enabled) music.detail else R.string.slideshow_music_needs_key),
                             selected = selected,
                             enabled = enabled,
                             onClick = { settings.music = music; back() },
@@ -174,13 +178,13 @@ private fun MainPage(
     val duration = remember { FocusRequester() }
     val mode = remember { FocusRequester() }
     val music = remember { FocusRequester() }
-    PageTitle("Slideshow")
+    PageTitle(stringResource(R.string.slideshow))
     ListItem(
         selected = false,
         enabled = canStart,
         onClick = onStart,
-        headlineContent = { Text(if (running) "Continuar slideshow" else "Iniciar slideshow") },
-        supportingContent = { Text(if (canStart) "A partir desta foto" else "Escolha uma foto: os vídeos ficam de fora") },
+        headlineContent = { Text(stringResource(if (running) R.string.slideshow_resume else R.string.slideshow_start)) },
+        supportingContent = { Text(stringResource(if (canStart) R.string.slideshow_from_here else R.string.slideshow_pick_photo)) },
         leadingContent = {
             Box(
                 Modifier.size(36.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
@@ -191,9 +195,9 @@ private fun MainPage(
         },
         modifier = Modifier.focusRequester(start),
     )
-    SettingRow(Icons.Outlined.Timer, "Duração de cada foto", secondsLabel(settings.seconds), { onOpen(MenuPage.Duration) }, Modifier.focusRequester(duration))
-    SettingRow(Icons.Outlined.AutoAwesome, "Modo", settings.mode.label, { onOpen(MenuPage.Mode) }, Modifier.focusRequester(mode))
-    SettingRow(Icons.Outlined.MusicNote, "Música de fundo", settings.music.label, { onOpen(MenuPage.Music) }, Modifier.focusRequester(music))
+    SettingRow(Icons.Outlined.Timer, stringResource(R.string.slideshow_duration), secondsLabel(settings.seconds), { onOpen(MenuPage.Duration) }, Modifier.focusRequester(duration))
+    SettingRow(Icons.Outlined.AutoAwesome, stringResource(R.string.slideshow_mode), stringResource(settings.mode.label), { onOpen(MenuPage.Mode) }, Modifier.focusRequester(mode))
+    SettingRow(Icons.Outlined.MusicNote, stringResource(R.string.slideshow_music), stringResource(settings.music.label), { onOpen(MenuPage.Music) }, Modifier.focusRequester(music))
     LaunchedEffect(Unit) {
         when {
             returnTo == MenuPage.Duration -> duration
@@ -281,7 +285,7 @@ fun SlideshowStatus(seconds: Int, track: Track?, progress: Float) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                Text("Slideshow · $seconds s por foto", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                Text(stringResource(R.string.slideshow_status, seconds), style = MaterialTheme.typography.titleSmall, color = Color.White)
             }
             if (track != null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -304,7 +308,7 @@ fun SlideshowStatus(seconds: Int, track: Track?, progress: Float) {
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)))),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            KeyHints("OK" to "pausa", "Voltar" to "termina", modifier = Modifier.padding(top = 40.dp, bottom = 14.dp))
+            KeyHints("OK" to stringResource(R.string.hint_pause), stringResource(R.string.key_back) to stringResource(R.string.hint_end), modifier = Modifier.padding(top = 40.dp, bottom = 14.dp))
             Canvas(Modifier.fillMaxWidth().height(3.dp)) {
                 drawRect(Color.White.copy(alpha = 0.2f))
                 drawRect(Color.White, size = size.copy(width = size.width * progress.coerceIn(0f, 1f)), topLeft = Offset.Zero)
@@ -319,7 +323,7 @@ fun SlideshowPaused(track: Track?) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f))) {
         Box(Modifier.align(Alignment.Center)) {
             CenterDisc {
-                Icon(Icons.Filled.Pause, contentDescription = "Slideshow em pausa", tint = OnControlColor, modifier = Modifier.size(56.dp))
+                Icon(Icons.Filled.Pause, contentDescription = stringResource(R.string.slideshow_paused), tint = OnControlColor, modifier = Modifier.size(56.dp))
             }
         }
         Column(
@@ -331,11 +335,15 @@ fun SlideshowPaused(track: Track?) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Slideshow em pausa", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text(stringResource(R.string.slideshow_paused), style = MaterialTheme.typography.titleMedium, color = Color.White)
             if (track != null) {
                 Text("${track.title} · ${track.artist}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.75f))
             }
-            KeyHints("OK" to "continua", "◀ ▶" to "foto anterior / seguinte", "OK premido" to "opções")
+            KeyHints(
+                "OK" to stringResource(R.string.hint_resume),
+                "◀ ▶" to stringResource(R.string.hint_prev_next),
+                stringResource(R.string.key_ok_held) to stringResource(R.string.hint_options),
+            )
         }
     }
 }

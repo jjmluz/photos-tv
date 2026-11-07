@@ -7,12 +7,15 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.Locale;
 
-/** Writes the TV launcher banner: white card, pinwheel on the left, "Fotos" as vector outlines. */
+/**
+ * Writes the TV launcher banner: white card, pinwheel on the left, the app name as vector outlines.
+ * Arguments: the Roboto font, the output file and the name (e.g. "Photos" or "Fotos").
+ */
 public class Banner {
     public static void main(String[] args) throws Exception {
         Font font = Font.createFont(Font.TRUETYPE_FONT, new File(args[0])).deriveFont(56f);
         FontRenderContext frc = new FontRenderContext(null, true, true);
-        GlyphVector gv = font.createGlyphVector(frc, "Fotos");
+        GlyphVector gv = font.createGlyphVector(frc, args[2]);
         Rectangle2D text = gv.getVisualBounds();
 
         double iconSize = 88;            // pinwheel diameter in banner units

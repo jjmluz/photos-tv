@@ -1,0 +1,96 @@
+<resources>
+    <string name="app_name">Photos</string>
+
+    <!-- Onglets -->
+    <string name="tab_photos">Photos</string>
+    <string name="tab_albums">Albums</string>
+    <string name="tab_people">Personnes</string>
+
+    <!-- Connexion -->
+    <string name="sign_in">Se connecter</string>
+    <string name="add_account">Ajouter un autre compte</string>
+    <string name="sign_in_step_phone">Sur votre téléphone, ouvrez l’app Photos TV et scannez ce code.</string>
+    <string name="sign_in_step_account">Connectez-vous à votre compte Google. La TV garde sa propre session et la renouvelle toute seule.</string>
+    <string name="sign_in_cookies">Vous pouvez aussi exporter vos cookies sous le nom %1$s et les envoyer avec adb push &lt;fichier&gt; %2$s</string>
+    <string name="sign_in_no_network">La TV n’est pas connectée au réseau.</string>
+    <string name="sign_in_waiting">En attente du téléphone…</string>
+    <string name="sign_in_waiting_cancel">En attente du téléphone… Appuyez sur Retour pour annuler.</string>
+    <string name="sign_in_qr">Code QR d’association</string>
+    <string name="cookies_unreadable">Impossible de lire ce fichier.</string>
+    <string name="cookies_no_session">Aucun cookie de session Google trouvé. Exportez les cookies en étant connecté à photos.google.com.</string>
+
+    <!-- Compte -->
+    <string name="sign_out">Se déconnecter</string>
+    <string name="google_account">Compte Google</string>
+
+    <!-- Erreurs et pages vides -->
+    <string name="auth_failed">Impossible d’accéder à Google Photos</string>
+    <string name="auth_failed_back">Appuyez sur Retour pour vous reconnecter.</string>
+    <string name="retry">Réessayer</string>
+    <string name="session_expired">La session a expiré</string>
+    <string name="session_expired_message">Reconnectez-vous à Google Photos.</string>
+    <string name="load_failed">Chargement impossible</string>
+    <string name="photos_empty">Rien pour l’instant</string>
+    <string name="photos_empty_message">Les photos et vidéos de votre sauvegarde apparaissent ici.</string>
+    <string name="albums_empty">Aucun album</string>
+    <string name="albums_empty_message">Les albums que vous créez dans Google Photos apparaissent ici.</string>
+    <string name="album_untitled">Sans titre</string>
+    <string name="people_empty">Aucune personne</string>
+    <string name="people_empty_message">Les personnes et animaux reconnus par Google Photos apparaissent ici.</string>
+    <string name="person_unnamed">Sans nom</string>
+    <plurals name="item_count">
+        <item quantity="one">%d élément</item>
+        <item quantity="many">%d éléments</item>
+        <item quantity="other">%d éléments</item>
+    </plurals>
+
+    <!-- Chronologie -->
+    <string name="today">Aujourd’hui</string>
+    <string name="yesterday">Hier</string>
+
+    <!-- Visionneuse -->
+    <string name="play">Lire</string>
+    <string name="video_paused">En pause</string>
+    <string name="video_playing">Lecture en cours</string>
+    <string name="video_unplayable">Impossible de lire cette vidéo</string>
+
+    <!-- Diaporama -->
+    <string name="slideshow">Diaporama</string>
+    <string name="slideshow_start">Lancer le diaporama</string>
+    <string name="slideshow_resume">Reprendre le diaporama</string>
+    <string name="slideshow_from_here">À partir de cette photo</string>
+    <string name="slideshow_pick_photo">Choisissez une photo : les vidéos sont exclues</string>
+    <string name="slideshow_duration">Durée de chaque photo</string>
+    <plurals name="slideshow_seconds">
+        <item quantity="one">%d seconde</item>
+        <item quantity="many">%d secondes</item>
+        <item quantity="other">%d secondes</item>
+    </plurals>
+    <string name="slideshow_mode">Mode</string>
+    <string name="slideshow_music">Musique de fond</string>
+    <string name="slideshow_music_needs_key">Nécessite une clé Jamendo</string>
+    <string name="slideshow_status">Diaporama · %d s par photo</string>
+    <string name="slideshow_paused">Diaporama en pause</string>
+    <string name="music_load_failed">Impossible de charger la musique</string>
+
+    <string name="mode_static">Statique</string>
+    <string name="mode_static_detail">Une photo après l’autre, sans mouvement</string>
+    <string name="mode_dynamic">Dynamique</string>
+    <string name="mode_dynamic_detail">Des fondus doux et un zoom lent sur chaque photo</string>
+
+    <string name="music_off">Désactivée</string>
+    <string name="music_off_detail">La musique d’une autre app continue de jouer</string>
+    <string name="music_calm">Calme</string>
+    <string name="music_calm_detail">Instrumentaux apaisants</string>
+    <string name="music_happy">Joyeuse</string>
+    <string name="music_happy_detail">Instrumentaux entraînants</string>
+
+    <!-- Touches de la télécommande et leur effet -->
+    <string name="key_back">Retour</string>
+    <string name="key_ok_held">OK maintenu</string>
+    <string name="hint_pause">pause</string>
+    <string name="hint_end">arrêter</string>
+    <string name="hint_resume">reprendre</string>
+    <string name="hint_prev_next">photo précédente / suivante</string>
+    <string name="hint_options">options</string>
+</resources>

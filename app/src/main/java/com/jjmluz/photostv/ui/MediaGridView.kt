@@ -1,5 +1,6 @@
 package com.jjmluz.photostv.ui
 
+import android.content.res.Resources
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,6 +25,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,12 +34,11 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
-import com.jjmluz.photostv.AppLocale
+import com.jjmluz.photostv.R
 import com.jjmluz.photostv.MediaGrid
 import com.jjmluz.photostv.data.MediaItem
 import kotlinx.coroutines.delay
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 private sealed interface Entry {
     val key: String
@@ -49,17 +51,14 @@ private sealed interface Entry {
 
 private const val COLUMNS = 6
 private const val PREFETCH_DELAY_MS = 400L
-private val SameYear = DateTimeFormatter.ofPattern("EEE, d 'de' MMMM", AppLocale)
-private val OtherYear = DateTimeFormatter.ofPattern("EEE, d 'de' MMMM 'de' yyyy", AppLocale)
-
-private fun dayLabel(date: LocalDate, today: LocalDate): String = when {
-    date == today -> "Hoje"
-    date == today.minusDays(1) -> "Ontem"
-    date.year == today.year -> date.format(SameYear).capitalized()
-    else -> date.format(OtherYear).capitalized()
+private fun dayLabel(date: LocalDate, today: LocalDate, res: Resources): String = when {
+    date == today -> res.getString(R.string.today)
+    date == today.minusDays(1) -> res.getString(R.string.yesterday)
+    date.year == today.year -> date.format(localizedFormatter("EEEdMMMM")).capitalized()
+    else -> date.format(localizedFormatter("EEEdMMMMyyyy")).capitalized()
 }
 
-private fun buildEntries(items: List<MediaItem>, groupByDay: Boolean): List<Entry> {
+private fun buildEntries(items: List<MediaItem>, groupByDay: Boolean, res: Resources): List<Entry> {
     if (!groupByDay) return items.mapIndexed { i, item -> Entry.Tile(i, item) }
     val today = LocalDate.now()
     val out = ArrayList<Entry>(items.size + items.size / 8)
@@ -68,7 +67,7 @@ private fun buildEntries(items: List<MediaItem>, groupByDay: Boolean): List<Entr
         val d = item.localDateTime.toLocalDate()
         if (d != day) {
             day = d
-            out += Entry.Header(dayLabel(d, today), "day-$d")
+            out += Entry.Header(dayLabel(d, today, res), "day-$d")
         }
         out += Entry.Tile(i, item)
     }
@@ -90,7 +89,8 @@ fun MediaGridView(
     title: (@Composable () -> Unit)? = null,
 ) {
     val state by grid.feed.state.collectAsStateWithLifecycle()
-    val entries = remember(state.items, groupByDay) { buildEntries(state.items, groupByDay) }
+    val res = LocalResources.current
+    val entries = remember(state.items, groupByDay, res) { buildEntries(state.items, groupByDay, res) }
     val positions = remember(entries) { entries.withIndex().associate { (i, e) -> e.key to i } }
     val offset = if (title != null) 1 else 0
     val context = LocalContext.current
@@ -104,7 +104,7 @@ fun MediaGridView(
         }
         when {
             state.error != null -> FeedError(state.error!!, grid.feed::refresh, onSignIn)
-            state.endReached -> MessageScreen("Ainda não há nada aqui", "As fotos e os vídeos da sua cópia de segurança aparecem aqui.", icon = Icons.Outlined.PhotoLibrary)
+            state.endReached -> MessageScreen(stringResource(R.string.photos_empty), stringResource(R.string.photos_empty_message), icon = Icons.Outlined.PhotoLibrary)
             else -> LoadingScreen()
         }
         return

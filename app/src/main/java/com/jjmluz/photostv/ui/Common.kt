@@ -1,5 +1,6 @@
 package com.jjmluz.photostv.ui
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Border
@@ -48,8 +50,12 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.jjmluz.photostv.AppLocale
+import com.jjmluz.photostv.R
 import com.jjmluz.photostv.data.MediaItem
 import com.jjmluz.photostv.data.NotSignedInException
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /** Thumbnail edge in pixels; a bit over the focused tile size on a 1080p UI. */
 const val THUMB_PX = 400
@@ -134,9 +140,9 @@ fun MessageScreen(
 @Composable
 fun FeedError(error: Throwable, onRetry: () -> Unit, onSignIn: () -> Unit) {
     if (error is NotSignedInException) {
-        MessageScreen("A sessão expirou", "Inicie sessão novamente no Google Fotos.", "Iniciar sessão", onSignIn, Icons.Outlined.Lock)
+        MessageScreen(stringResource(R.string.session_expired), stringResource(R.string.session_expired_message), stringResource(R.string.sign_in), onSignIn, Icons.Outlined.Lock)
     } else {
-        MessageScreen("Não foi possível carregar", error.message ?: error.toString(), "Tentar novamente", onRetry, Icons.Outlined.CloudOff)
+        MessageScreen(stringResource(R.string.load_failed), error.message ?: error.toString(), stringResource(R.string.retry), onRetry, Icons.Outlined.CloudOff)
     }
 }
 
@@ -209,6 +215,16 @@ fun formatDuration(ms: Long): String {
 
 /** Capitalizes the first letter, e.g. "terça-feira" as a heading. */
 fun String.capitalized() = replaceFirstChar { it.titlecase(AppLocale) }
+
+private val Formatters = ConcurrentHashMap<Pair<Locale, String>, DateTimeFormatter>()
+
+/**
+ * A formatter for the fields in [skeleton] (e.g. "EEEdMMMM" for weekday, day and month), in the
+ * app's language with that language's own order and words: "Sat, Nov 7", "sáb., 7 de novembro".
+ */
+fun localizedFormatter(skeleton: String): DateTimeFormatter = Formatters.getOrPut(AppLocale to skeleton) {
+    DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(AppLocale, skeleton), AppLocale)
+}
 
 /** The focused key after [key]'s tile gains or loses focus, given the [current] one. */
 fun trackFocus(current: String?, key: String, focused: Boolean): String? = when {

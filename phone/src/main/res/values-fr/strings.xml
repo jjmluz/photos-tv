@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">Photos TV</string>
+    <string name="start_title">Se connecter sur la TV</string>
+    <string name="start_message">Ouvrez l’app Photos sur la TV et scannez le code QR affiché à l’écran.</string>
+    <string name="scan">Scanner le code QR</string>
+    <string name="sending">Connexion de la TV…</string>
+    <string name="done_title">Connecté</string>
+    <string name="done_message">La TV est connectée en tant que %s. Vous pouvez fermer cette app.</string>
+    <string name="done">Terminé</string>
+    <string name="failed_title">Connexion impossible</string>
+    <string name="retry">Réessayer</string>
+    <string name="local_network_denied">Sans accès au réseau local, l’app ne peut pas communiquer avec la TV. Autorisez l’accès aux appareils à proximité.</string>
+    <string name="not_tv_qr">Ce code QR ne vient pas de l’app Photos sur la TV.</string>
+    <string name="scan_failed">Impossible de lire le code : %s</string>
+    <string name="email_title">Quel compte ?</string>
+    <string name="email_message">Saisissez l’adresse e-mail du compte Google avec lequel vous venez de vous connecter.</string>
+    <string name="email_label">Adresse e-mail</string>
+    <string name="continue_">Continuer</string>
+    <string name="tv_no_answer">La TV n’a pas répondu. L’app Photos est-elle ouverte et sur le même réseau ?</string>
+    <string name="tv_wrong_code">Ce code QR ne correspond plus à cette TV. Scannez-le à nouveau.</string>
+    <string name="tv_stale">La TV a refusé l’envoi. Vérifiez que l’heure du téléphone est correcte.</string>
+    <string name="tv_http">La TV a répondu avec HTTP %d.</string>
+</resources>

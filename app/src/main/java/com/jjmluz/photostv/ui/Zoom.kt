@@ -48,22 +48,24 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.jjmluz.photostv.AppLocale
+import com.jjmluz.photostv.data.MediaItem
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.disk.DiskCache
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.size.Precision
-import com.jjmluz.photostv.data.MediaItem
+import java.text.NumberFormat
+import kotlin.math.floor
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.floor
-import kotlin.math.ceil
-import kotlin.math.roundToInt
 
 private const val TAG = "PhotosTV"
 
@@ -142,7 +144,7 @@ class PhotoZoom(private val scope: CoroutineScope, private val photoAspect: Floa
     private val cy = Animatable(0.5f)
 
     val zoomed get() = level > 0
-    val label get() = ZOOM_LEVELS[level].let { if (it % 1f == 0f) "${it.toInt()}×" else "${it.toString().replace('.', ',')}×" }
+    val label get() = NumberFormat.getInstance(AppLocale).format(ZOOM_LEVELS[level]) + "×"
 
     private fun viewOf(zoom: Float, x: Float, y: Float) = ZoomView(zoom, x, y, photoAspect, screenAspect)
 

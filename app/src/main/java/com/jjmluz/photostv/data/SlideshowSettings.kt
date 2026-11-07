@@ -1,22 +1,24 @@
 package com.jjmluz.photostv.data
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.jjmluz.photostv.R
 
 /** Background music for slideshows: off, or a Jamendo playlist of instrumental tracks with [tag]. */
-enum class SlideshowMusic(val label: String, val detail: String, val tag: String?) {
-    Off("Desligada", "A música que estiver a tocar noutra app continua", null),
-    Calm("Calma", "Instrumental tranquila", "relaxation"),
-    Happy("Alegre", "Instrumental animada", "happy"),
+enum class SlideshowMusic(@StringRes val label: Int, @StringRes val detail: Int, val tag: String?) {
+    Off(R.string.music_off, R.string.music_off_detail, null),
+    Calm(R.string.music_calm, R.string.music_calm_detail, "relaxation"),
+    Happy(R.string.music_happy, R.string.music_happy_detail, "happy"),
 }
 
 /** Static shows one photo after another; dynamic dissolves between them and slowly zooms each one. */
-enum class SlideshowMode(val label: String, val detail: String) {
-    Static("Estático", "Uma foto de cada vez, sem movimento"),
-    Dynamic("Dinâmico", "Transições suaves e um zoom lento em cada foto"),
+enum class SlideshowMode(@StringRes val label: Int, @StringRes val detail: Int) {
+    Static(R.string.mode_static, R.string.mode_static_detail),
+    Dynamic(R.string.mode_dynamic, R.string.mode_dynamic_detail),
 }
 
 /** How long each photo stays on screen, how they change and which music plays, kept between launches. */

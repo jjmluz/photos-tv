@@ -80,4 +80,4 @@ data class Profile(val name: String?, val email: String?, val pictureUrl: String
     fun pictureUrl(px: Int) = pictureUrl?.let { "${it.substringBefore('=')}=s$px-c" }
 }
 
-class NotSignedInException : Exception("Sem sessão iniciada no Google Fotos")
+class NotSignedInException : Exception("Not signed in to Google Photos")

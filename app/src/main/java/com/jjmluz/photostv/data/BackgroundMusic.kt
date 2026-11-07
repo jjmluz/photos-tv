@@ -14,6 +14,7 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.jjmluz.photostv.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -62,7 +63,7 @@ class BackgroundMusic(
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Music: ${e.message}")
-                Toast.makeText(context, "Não foi possível carregar a música", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, R.string.music_load_failed, Toast.LENGTH_LONG).show()
                 mood = null
                 return@launch
             }

@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jjmluz.photostv.MainViewModel
+import com.jjmluz.photostv.R
 import com.jjmluz.photostv.data.Person
 
 @Composable
@@ -45,7 +48,7 @@ fun PeopleTab(vm: MainViewModel) {
             onOpen = { vm.openViewer(open.grid, it) },
             onSignIn = vm::signOut,
             groupByDay = true,
-            title = { ScreenTitle(open.person.name ?: "Sem nome", photoCount(open.person.itemCount)) },
+            title = { ScreenTitle(open.person.name ?: stringResource(R.string.person_unnamed), photoCount(open.person.itemCount)) },
         )
         // Focus the newest photo when entering the person's page.
         val state by open.grid.feed.state.collectAsStateWithLifecycle()
@@ -69,7 +72,7 @@ private fun PeopleList(vm: MainViewModel) {
     if (state.items.isEmpty()) {
         when {
             state.error != null -> FeedError(state.error!!, feed::refresh, vm::signOut)
-            state.endReached -> MessageScreen("Sem pessoas", "As pessoas e os animais que o Google Fotos reconhecer aparecem aqui.", icon = Icons.Outlined.People)
+            state.endReached -> MessageScreen(stringResource(R.string.people_empty), stringResource(R.string.people_empty_message), icon = Icons.Outlined.People)
             else -> LoadingScreen()
         }
         return
@@ -150,4 +153,5 @@ private fun PersonCard(person: Person, onClick: () -> Unit, modifier: Modifier =
     }
 }
 
-private fun photoCount(n: Int) = if (n == 1) "1 item" else "$n itens"
+@Composable
+private fun photoCount(n: Int) = pluralStringResource(R.plurals.item_count, n, n)

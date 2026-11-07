@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -43,8 +44,9 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import coil3.compose.AsyncImage
+import com.jjmluz.photostv.R
 import com.jjmluz.photostv.data.Profile
+import coil3.compose.AsyncImage
 
 /** Account pictures are fetched once at this size, for both the button and the dialog. */
 private const val PICTURE_PX = 160
@@ -135,7 +137,7 @@ private fun AccountDialog(
             ListItem(
                 selected = false,
                 onClick = onAdd,
-                headlineContent = { Text("Adicionar outra conta") },
+                headlineContent = { Text(stringResource(R.string.add_account)) },
                 leadingContent = {
                     Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
                         Icon(Icons.Outlined.PersonAdd, contentDescription = null)
@@ -144,7 +146,7 @@ private fun AccountDialog(
                 modifier = if (otherAccounts.isEmpty()) Modifier.focusRequester(focus) else Modifier,
             )
             Spacer(Modifier.height(12.dp))
-            Button(onClick = onSignOut) { Text("Terminar sessão") }
+            Button(onClick = onSignOut) { Text(stringResource(R.string.sign_out)) }
         }
     }
     LaunchedEffect(Unit) { focus.requestFocusSafely() }
@@ -175,7 +177,7 @@ private fun Avatar(profile: Profile?, size: Dp) {
         profile?.pictureUrl(PICTURE_PX)?.let { url ->
             AsyncImage(
                 model = rememberImageRequest(url),
-                contentDescription = "Conta Google",
+                contentDescription = stringResource(R.string.google_account),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )

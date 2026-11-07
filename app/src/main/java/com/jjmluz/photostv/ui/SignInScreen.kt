@@ -25,7 +25,9 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -53,6 +55,7 @@ private const val FILE_NAME = "cookies.txt"
 @Composable
 fun SignInScreen(onImported: () -> Unit, adding: Boolean = false) {
     val context = LocalContext.current
+    val res = LocalResources.current
     val dir = remember { context.getExternalFilesDir(null)!! }
     var error by remember { mutableStateOf<String?>(null) }
     val pairing = context.app.pairing
@@ -70,7 +73,10 @@ fun SignInScreen(onImported: () -> Unit, adding: Boolean = false) {
                     onImported()
                     return@LaunchedEffect
                 }
-                error = result.exceptionOrNull()?.message ?: "Não foi possível ler esse ficheiro."
+                error = when (val e = result.exceptionOrNull()) {
+                    is CookieImport.NoSessionCookies -> res.getString(R.string.cookies_no_session)
+                    else -> e?.message ?: res.getString(R.string.cookies_unreadable)
+                }
             }
             delay(1_000)
         }
@@ -88,27 +94,26 @@ fun SignInScreen(onImported: () -> Unit, adding: Boolean = false) {
             contentAlignment = Alignment.Center,
         ) {
             if (qr != null) {
-                Image(qr, contentDescription = "Código QR para emparelhar", filterQuality = FilterQuality.None, modifier = Modifier.fillMaxSize())
+                Image(qr, contentDescription = stringResource(R.string.sign_in_qr), filterQuality = FilterQuality.None, modifier = Modifier.fillMaxSize())
             } else {
                 Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, modifier = Modifier.fillMaxSize())
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.weight(1f)) {
-            Text(if (adding) "Adicionar outra conta" else "Iniciar sessão", style = MaterialTheme.typography.displaySmall)
-            Step(1, "No telemóvel, abra a app Fotos TV e leia este código.")
-            Step(2, "Inicie sessão na sua conta Google. A TV fica com sessão própria e renova-a sozinha.")
+            Text(stringResource(if (adding) R.string.add_account else R.string.sign_in), style = MaterialTheme.typography.displaySmall)
+            Step(1, stringResource(R.string.sign_in_step_phone))
+            Step(2, stringResource(R.string.sign_in_step_account))
             Text(
-                "Em alternativa, exporte os cookies como $FILE_NAME e envie-os com " +
-                    "adb push <ficheiro> ${dir.absolutePath.replace("/storage/emulated/0", "/sdcard")}/$FILE_NAME",
+                stringResource(R.string.sign_in_cookies, FILE_NAME, "${dir.absolutePath.replace("/storage/emulated/0", "/sdcard")}/$FILE_NAME"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 12.dp),
             )
             Text(
                 error ?: when {
-                    qr == null -> "A TV não está ligada à rede."
-                    adding -> "À espera do telemóvel… Prima Voltar para cancelar."
-                    else -> "À espera do telemóvel…"
+                    qr == null -> stringResource(R.string.sign_in_no_network)
+                    adding -> stringResource(R.string.sign_in_waiting_cancel)
+                    else -> stringResource(R.string.sign_in_waiting)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,

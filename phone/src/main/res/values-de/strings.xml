@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">Fotos TV</string>
+    <string name="start_title">Auf dem Fernseher anmelden</string>
+    <string name="start_message">Öffnen Sie die App Fotos auf dem Fernseher und scannen Sie den angezeigten QR-Code.</string>
+    <string name="scan">QR-Code scannen</string>
+    <string name="sending">Fernseher wird angemeldet…</string>
+    <string name="done_title">Angemeldet</string>
+    <string name="done_message">Der Fernseher ist als %s angemeldet. Sie können diese App jetzt schließen.</string>
+    <string name="done">Fertig</string>
+    <string name="failed_title">Anmeldung fehlgeschlagen</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="local_network_denied">Ohne Zugriff auf das lokale Netzwerk kann die App den Fernseher nicht erreichen. Erlauben Sie den Zugriff auf Geräte in der Nähe.</string>
+    <string name="not_tv_qr">Dieser QR-Code stammt nicht von der App Fotos auf dem Fernseher.</string>
+    <string name="scan_failed">Der Code konnte nicht gelesen werden: %s</string>
+    <string name="email_title">Welches Konto?</string>
+    <string name="email_message">Geben Sie die E-Mail-Adresse des Google-Kontos ein, mit dem Sie sich gerade angemeldet haben.</string>
+    <string name="email_label">E-Mail</string>
+    <string name="continue_">Weiter</string>
+    <string name="tv_no_answer">Der Fernseher hat nicht geantwortet. Ist die App Fotos geöffnet und im selben Netzwerk?</string>
+    <string name="tv_wrong_code">Der QR-Code passt nicht mehr zu diesem Fernseher. Scannen Sie ihn erneut.</string>
+    <string name="tv_stale">Der Fernseher hat die Anfrage abgelehnt. Prüfen Sie, ob die Uhrzeit des Smartphones stimmt.</string>
+    <string name="tv_http">Der Fernseher hat mit HTTP %d geantwortet.</string>
+</resources>

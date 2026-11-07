@@ -44,6 +44,12 @@ android {
         compose = true
         buildConfig = true
     }
+
+    androidResources {
+        // English, Portuguese, Spanish, French and German, so Android lists them in the app's
+        // language settings (res/resources.properties names the default, English).
+        generateLocaleConfig = true
+    }
 }
 
 dependencies {

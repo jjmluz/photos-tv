@@ -1,25 +1,27 @@
-# Fotos for Google TV
+# Photos for Google TV
 
 A Google Photos client for the Google TV Streamer (Android TV 14 / API 34), built with
-Jetpack Compose for TV (Material 3). The app is in European Portuguese only: the UI text is
-written in pt-PT and the app forces the pt-PT locale, so dates and the video player's controls
-match regardless of the TV's system language.
+Jetpack Compose for TV (Material 3).
 
-- **Tabs**: Fotos, Álbuns and Pessoas along the top; moving along them switches page
+- **Languages**: English, Portuguese (European), Spanish, French and German, picked from the TV's
+  system language (or the app's own language setting, where Android offers one); any other language
+  gets English. Dates, month names and the video player's controls follow the same language. The
+  phone app does the same with the phone's language
+- **Tabs**: Photos, Albums and People along the top; moving along them switches page
 - **Account**: your Google account picture at the top right, past the tabs; select it to see the
-  account, switch to another account signed in on the TV, add one ("Adicionar outra conta", which
+  account, switch to another account signed in on the TV, add one ("Add another account", which
   shows the QR code for the phone again; Back cancels) or sign out. Signing out removes only the
   account showing, and the next one takes its place
 - **Back**: on a list, moves focus back to its first item (the newest photo, the first album or
   person); pressed again there, it exits the app
 - **Photos**: your whole library as a timeline, grouped by day, newest first
-- **Timeline**: on Fotos, moving right past the last column opens a list of years and months
+- **Timeline**: on Photos, moving right past the last column opens a list of years and months
   (a side menu). Up/down pick a month, OK jumps there; the grid then fills in
   newer photos as you scroll up. Moving right again reaches a column of years: up/down move
   between years, OK jumps to that year's newest month, left returns to its months. The month list takes one small request per month with photos
   on first use, and is cached after that.
 - **Albums**: your albums (owned and shared), and the photos in each one
-- **Pessoas**: the people (and pets) Google Photos recognised, as round faces with their name and
+- **People**: the people (and pets) Google Photos recognised, as round faces with their name and
   number of photos; open one to see their photos by day
 - **Viewer**: full-screen at the TV's native resolution. The app's window is 1080p even on a 4K
   TV (the system scales it up), so a photo first shows at 1080p, which arrives almost at once,
@@ -40,16 +42,16 @@ match regardless of the TV's system language.
   While a video plays, a progress bar shows the time played and the length; ◀ ▶ (or rewind/fast
   forward) jump 10 s, 30 s while held, OK or play/pause pauses, and Back stops it
 - **Slideshow**: in the viewer, hold OK (or press the menu key) on a photo for a panel with
-  "Iniciar slideshow", how long each photo shows (3 to 30 s) and the background music. Play/pause
+  "Start slideshow", how long each photo shows (3 to 30 s) and the background music. Play/pause
   on a photo starts it too. The slideshow shows photos only, skipping videos, and can't start from
   one. OK or play/pause pauses it, ◀ ▶ step between photos, Back ends it on the photo showing.
   Leaving the app pauses it. The settings are kept between launches. The next three photos are
   downloaded ahead, and a photo stays on screen until the next is ready: in 4K, or at 1080p after
-  3 s more, with a photo that won't load within 15 s passed over. "Modo" picks Estático (one
-  photo after another) or Dinâmico: each photo dissolves into the next over 0.7 s and slowly zooms
+  3 s more, with a photo that won't load within 15 s passed over. "Mode" picks Static (one
+  photo after another) or Dynamic: each photo dissolves into the next over 0.7 s and slowly zooms
   in or out (by 8%, alternating), drawn into the 4K layer frame by frame; a photo whose 4K version
   isn't ready yet moves at 1080p until it is
-- **Music**: "Calma" and "Alegre" stream popular instrumental tracks with those tags from
+- **Music**: "Calm" and "Upbeat" stream popular instrumental tracks with those tags from
   [Jamendo](https://www.jamendo.com) (Creative Commons music), shuffled, fading in and out with the
   slideshow; the track and its artist show for a few seconds when it starts. With the music off,
   music already playing in another app (say Spotify) carries on under the slideshow
@@ -140,7 +142,7 @@ adb connect <tv-ip>:<debug-port>
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:installRelease
 ```
 
-The app shows up under **Apps** on the Google TV home screen as **Fotos**.
+The app shows up under **Apps** on the Google TV home screen as **Photos** (**Fotos** in Portuguese, Spanish and German).
 
 Install the phone app the same way, with wireless debugging on the phone, or copy
 `phone/build/outputs/apk/release/phone-release.apk` to it and open the file:
@@ -149,17 +151,17 @@ Install the phone app the same way, with wireless debugging on the phone, or cop
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :phone:installRelease
 ```
 
-It shows up as **Fotos TV**.
+It shows up as **Photos TV** (**Fotos TV** in Portuguese, Spanish and German).
 
 ## Sign in
 
-1. Open the Fotos app on the TV. Its sign-in screen shows a QR code.
-2. On the phone, open **Fotos TV**, choose **Ler código QR** and scan it. The first time, allow the
+1. Open the Photos app on the TV. Its sign-in screen shows a QR code.
+2. On the phone, open **Photos TV**, choose **Scan QR code** and scan it. The first time, allow the
    app to find devices on the local network.
 3. Sign in to your Google account on the page that opens, and accept Google's terms if asked.
-4. The phone says **Sessão iniciada** and the TV opens your library.
+4. The phone says **Signed in** and the TV opens your library.
 
-The phone and the TV must be on the same network, with the Fotos app open on the TV. Nothing stays on
+The phone and the TV must be on the same network, with the Photos app open on the TV. Nothing stays on
 the phone: it clears its cookies once the TV has answered. The TV makes a new web session by itself
 whenever Google ends the current one, so you only sign in again after signing out (select your
 picture at the top right, or press Back on the error screen) or if the master token is revoked.
@@ -185,7 +187,7 @@ sign-in screen.
 
 ```
 app/src/main/java/com/jjmluz/photostv/
-  PhotosTvApp.kt        OkHttp + Coil setup, sign-out
+  PhotosTvApp.kt        OkHttp + Coil setup, sign-out, app language
   MainActivity.kt       auth gate and top-level navigation
   MainViewModel.kt      feeds, tab/album/viewer state, focus restoration keys
   data/
@@ -201,10 +203,10 @@ app/src/main/java/com/jjmluz/photostv/
     BackgroundMusic.kt  plays a Jamendo playlist behind the slideshow, with fades
   ui/
     SignInScreen.kt     pairing QR code for the phone app
-    HomeScreen.kt       top tabs (Fotos, Álbuns, Pessoas)
+    HomeScreen.kt       top tabs (Photos, Albums, People)
     AccountMenu.kt      account picture at the top right, and its sign-out dialog
     MediaGridView.kt    day-grouped, paged photo grid
-    TimelinePanel.kt    years/months panel on the right of Fotos
+    TimelinePanel.kt    years/months panel on the right of Photos
     AlbumsScreen.kt     album list and album contents
     PeopleScreen.kt     people grid and a person's photos
     ViewerScreen.kt     full-screen viewer, slideshow, video player
@@ -216,12 +218,26 @@ phone/src/main/java/com/jjmluz/photostv/phone/
   Tv.kt                 pairing link parsing and the encrypted request to the TV
 ```
 
+## Translations
+
+The text is in `res/values/strings.xml`, in English, which is also the fallback, with translations in
+`values-pt`, `values-es`, `values-fr` and `values-de`, for both `app` and `phone`. To add a language,
+add a `values-<code>` folder to both modules, add its code to `Translated` in `PhotosTvApp.kt`, and
+give it a launcher banner if its app name isn't "Photos" (see below).
+
 ## Launcher banner
 
-The Google TV launcher shows apps as 320×180 cards (`res/drawable/banner.xml`): a white card with the
-pinwheel and "Fotos". Vector drawables can't hold text, so the word is stored as outlines generated
-from Roboto. To change it, edit and re-run the generator:
+The Google TV launcher shows apps as 320×180 cards: a white card with the pinwheel and the app's name,
+"Photos" (`res/drawable/banner.xml`) or "Fotos" in Portuguese, Spanish and German
+(`res/drawable-pt`, `-es`, `-de`). Vector drawables can't hold text, so the word is stored as
+outlines generated from Roboto. To change one, edit and re-run the generator with the file and the word:
 
 ```bash
-"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" -Djava.awt.headless=true tools/Banner.java "/Applications/Android Studio.app/Contents/plugins/design-tools/resources/layoutlib/data/fonts/RobotoStatic-Regular.ttf" app/src/main/res/drawable/banner.xml
+"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" -Djava.awt.headless=true tools/Banner.java "/Applications/Android Studio.app/Contents/plugins/design-tools/resources/layoutlib/data/fonts/RobotoStatic-Regular.ttf" app/src/main/res/drawable/banner.xml Photos
 ```
+
+```bash
+"/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" -Djava.awt.headless=true tools/Banner.java "/Applications/Android Studio.app/Contents/plugins/design-tools/resources/layoutlib/data/fonts/RobotoStatic-Regular.ttf" app/src/main/res/drawable-pt/banner.xml Fotos
+```
+
+A new language whose name differs from "Photos" needs its own `drawable-<code>/banner.xml`.
