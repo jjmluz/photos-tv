@@ -72,15 +72,15 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.13.0")
-    implementation("androidx.core:core-ktx:1.18.0")
+    implementation("androidx.core:core-ktx:1.19.1")
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     // Play Services' scanner: no camera permission, the system draws the viewfinder.
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     // The scanner brings an old Fragment, which breaks the permission request.
-    implementation("androidx.fragment:fragment:1.8.6")
+    implementation("androidx.fragment:fragment:1.9.1")
 
     testImplementation("junit:junit:4.13.2")
     // The platform's org.json is only a stub on the JVM.
-    testImplementation("org.json:json:20250517")
+    testImplementation("org.json:json:20260814")
 }
