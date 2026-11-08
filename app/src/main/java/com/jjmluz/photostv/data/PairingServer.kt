@@ -2,7 +2,6 @@ package com.jjmluz.photostv.data
 
 import android.content.Context
 import android.net.ConnectivityManager
-import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +18,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.SecureRandom
+import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -125,11 +125,8 @@ class PairingServer(context: Context, private val scope: CoroutineScope, private
 
     /** Decrypts a request's payload, refusing one sealed with another code, stale or replayed. */
     private fun open(body: ByteArray): JSONObject {
-        val envelope = JSONObject(String(body))
         val payload = try {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, envelope.getString("iv").fromBase64()))
-            JSONObject(String(cipher.doFinal(envelope.getString("data").fromBase64())))
+            unseal(key, body)
         } catch (e: Exception) {
             Log.w(TAG, "Pairing: refused a request that doesn't match the pairing code")
             throw Refusal(401 to """{"error":"pairing"}""")
@@ -180,13 +177,21 @@ class PairingServer(context: Context, private val scope: CoroutineScope, private
         }
 
         /** PBKDF2-SHA256 over the code without dashes; the phone app derives the same key. */
-        private fun deriveKey(code: String): SecretKeySpec {
+        internal fun deriveKey(code: String): SecretKeySpec {
             val clean = code.uppercase().filter { it.isLetterOrDigit() }
             val spec = PBEKeySpec(clean.toCharArray(), "photos-tv-cookie-sync".toByteArray(), 100_000, 256)
             val bytes = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
             return SecretKeySpec(bytes, "AES")
         }
 
-        private fun String.fromBase64(): ByteArray = Base64.decode(this, Base64.DEFAULT)
+        /** Opens the phone's `{"iv", "data"}` envelope; throws if it wasn't sealed with [key]. */
+        internal fun unseal(key: SecretKeySpec, body: ByteArray): JSONObject {
+            val envelope = JSONObject(String(body))
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, envelope.getString("iv").fromBase64()))
+            return JSONObject(String(cipher.doFinal(envelope.getString("data").fromBase64())))
+        }
+
+        private fun String.fromBase64(): ByteArray = Base64.getMimeDecoder().decode(this)
     }
 }

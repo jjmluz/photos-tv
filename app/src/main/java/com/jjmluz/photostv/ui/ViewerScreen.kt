@@ -74,9 +74,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -595,6 +597,7 @@ private fun InfoOverlay(item: MediaItem, location: String?) {
  * Full-screen playback with our own controls: left/right seek (faster while held), OK or
  * play/pause toggles pause, up/down show the progress bar. Back (handled by the viewer) closes it.
  */
+@OptIn(UnstableApi::class) // DefaultMediaSourceFactory, to fetch through OkHttp.
 @Composable
 private fun VideoPlayer(item: MediaItem, posterUrl: String, onEnded: () -> Unit) {
     val context = LocalContext.current

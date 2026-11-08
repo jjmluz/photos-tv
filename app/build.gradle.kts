@@ -18,11 +18,25 @@ android {
         // Google TV Streamer ships Android TV 14 (API 34).
         minSdk = 34
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = rootProject.extra["appVersionCode"] as Int
+        versionName = rootProject.extra["appVersionName"] as String
         // Jamendo API client id for slideshow music, kept in local.properties (not in git).
         // Without one, the music options are shown but can't be picked.
         buildConfigField("String", "JAMENDO_CLIENT_ID", "\"${localProperties.getProperty("jamendo.clientId", "")}\"")
+    }
+
+    signingConfigs {
+        // The release key, from local.properties (see README, Build). Without it, release builds are
+        // signed with the debug key, which only installs over builds from the same machine.
+        val storeFile = localProperties.getProperty("release.storeFile")
+        if (storeFile != null) {
+            create("release") {
+                this.storeFile = file(storeFile)
+                storePassword = localProperties.getProperty("release.storePassword")
+                keyAlias = localProperties.getProperty("release.keyAlias")
+                keyPassword = localProperties.getProperty("release.keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -30,9 +44,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Sideloaded personal build: sign with the debug key so `installRelease` just works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
+    }
+
+    testOptions {
+        // Unit tests run on the JVM: android.util.Log and friends do nothing instead of throwing.
+        unitTests.isReturnDefaultValues = true
     }
 
     compileOptions {
@@ -77,4 +95,9 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.11.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    testImplementation("junit:junit:4.13.2")
+    // The platform's org.json is only a stub on the JVM.
+    testImplementation("org.json:json:20250517")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 }

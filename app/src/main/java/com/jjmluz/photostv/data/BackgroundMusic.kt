@@ -8,9 +8,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -128,6 +130,7 @@ class BackgroundMusic(
         }
     }
 
+    @OptIn(UnstableApi::class) // DefaultMediaSourceFactory, to fetch through OkHttp.
     private fun newPlayer(tracks: List<Track>): ExoPlayer {
         val attributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)

@@ -64,7 +64,7 @@ data class Tv(val host: String, val code: String) {
 
     // The envelope data/PairingServer.kt in the TV app opens: AES-GCM with a key from the pairing
     // code by PBKDF2-SHA256. Keep the salt and iteration count in step.
-    private fun seal(plain: String): String {
+    internal fun seal(plain: String): String {
         val spec = PBEKeySpec(code.uppercase().filter { it.isLetterOrDigit() }.toCharArray(), "photos-tv-cookie-sync".toByteArray(), 100_000, 256)
         val key = SecretKeySpec(SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded, "AES")
         val iv = ByteArray(12).also(SecureRandom()::nextBytes)

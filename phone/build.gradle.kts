@@ -1,6 +1,12 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
 }
 
 android {
@@ -11,8 +17,22 @@ android {
         applicationId = "com.jjmluz.photostv.phone"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = rootProject.extra["appVersionCode"] as Int
+        versionName = rootProject.extra["appVersionName"] as String
+    }
+
+    signingConfigs {
+        // The release key, from local.properties (see README, Build). Without it, release builds are
+        // signed with the debug key, which only installs over builds from the same machine.
+        val storeFile = localProperties.getProperty("release.storeFile")
+        if (storeFile != null) {
+            create("release") {
+                this.storeFile = file(storeFile)
+                storePassword = localProperties.getProperty("release.storePassword")
+                keyAlias = localProperties.getProperty("release.keyAlias")
+                keyPassword = localProperties.getProperty("release.keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -20,9 +40,13 @@ android {
             // R8 breaks ML Kit's start-up (the scanner crashes with an NPE in its logger), and the
             // app is small enough not to need it.
             isMinifyEnabled = false
-            // Sideloaded personal build, like the TV app.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
+    }
+
+    testOptions {
+        // Unit tests run on the JVM: android.util.Log and friends do nothing instead of throwing.
+        unitTests.isReturnDefaultValues = true
     }
 
     compileOptions {
@@ -55,4 +79,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     // The scanner brings an old Fragment, which breaks the permission request.
     implementation("androidx.fragment:fragment:1.8.6")
+
+    testImplementation("junit:junit:4.13.2")
+    // The platform's org.json is only a stub on the JVM.
+    testImplementation("org.json:json:20250517")
 }

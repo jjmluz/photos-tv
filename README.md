@@ -116,7 +116,25 @@ You need Android Studio (its bundled JDK 21) and SDK platform 37.
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:assembleRelease
 ```
 
-The release build is minified and signed with the debug key, for sideloading.
+The release build is minified. It's signed with the key named in `local.properties`, or with the
+debug key when there's none, which only installs over builds from the same machine:
+
+```properties
+release.storeFile=/absolute/path/to/release.keystore
+release.storePassword=<password>
+release.keyAlias=<alias>
+release.keyPassword=<password>
+```
+
+Lint and the unit tests (no device needed):
+
+```bash
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew lintDebug testDebugUnitTest
+```
+
+GitHub Actions runs both on every push and pull request. Pushing a tag like `v1.2.3` builds both
+apps with that version, signed with the release key from the repository's secrets, and publishes
+them on the [Releases](https://github.com/jjmluz/photos-tv/releases) page.
 
 The slideshow music needs a Jamendo API client id: register an app (free, non-commercial) at
 [devportal.jamendo.com](https://devportal.jamendo.com) and add it to `local.properties`, which stays
@@ -142,7 +160,10 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradle
 
 ## Install on your TV
 
-These steps are for Google TV (the menu names differ a little on other Android TV devices).
+These steps are for Google TV (the menu names differ a little on other Android TV devices). Instead
+of building, you can download the APKs from the
+[latest release](https://github.com/jjmluz/photos-tv/releases/latest) and install them with
+`adb install photos-tv-<version>.apk`.
 
 1. On the TV, go to **Settings → System → About** and press **Android TV OS build** 7 times to
    unlock developer options.

@@ -1,0 +1,66 @@
+name: Release
+
+# Push a tag like v1.2.3 to build signed APKs of both apps and publish them as a GitHub release.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      - name: Set up signing and the Jamendo client id
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
+        run: |
+          keystore="$RUNNER_TEMP/release.keystore"
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          cat >> local.properties <<PROPS
+          release.storeFile=$keystore
+          release.storePassword=$RELEASE_KEYSTORE_PASSWORD
+          release.keyAlias=$RELEASE_KEY_ALIAS
+          release.keyPassword=$RELEASE_KEYSTORE_PASSWORD
+          jamendo.clientId=$JAMENDO_CLIENT_ID
+          PROPS
+
+      - name: Test
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build release APKs
+        run: ./gradlew assembleRelease -PappVersion="${GITHUB_REF_NAME#v}"
+
+      - name: Check the APKs are signed with the release key
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          for apk in app/build/outputs/apk/release/app-release.apk phone/build/outputs/apk/release/phone-release.apk; do
+            certs="$("$apksigner" verify --print-certs "$apk")"
+            echo "$certs"
+            grep -q "CN=Photos TV" <<< "$certs" || { echo "::error::$apk is not signed with the release key"; exit 1; }
+          done
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/photos-tv-$version.apk"
+          cp phone/build/outputs/apk/release/phone-release.apk "dist/photos-tv-phone-$version.apk"
+          (cd dist && sha256sum *.apk > SHA256SUMS)
+          gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
