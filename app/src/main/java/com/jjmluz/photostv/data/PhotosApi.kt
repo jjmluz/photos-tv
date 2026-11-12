@@ -185,6 +185,10 @@ open class PhotosApi(
                 if (renewed || !renewSession()) throw e
                 renewed = true
                 tokens = null
+            } catch (e: RateLimitedException) {
+                // Google refuses for a while when asked too much: wait it out, and don't add a page fetch to it.
+                if (++attempt >= 3) throw e
+                delay(5_000L * attempt)
             } catch (e: IOException) {
                 if (++attempt >= 3) throw e
                 // Tokens can go stale while the app sits in the background; refetch them.
@@ -225,8 +229,13 @@ open class PhotosApi(
             val text = response.body!!.string()
             val line = text.lineSequence().firstOrNull { "wrb.fr" in it }
                 ?: throw IOException("$rpcId: unexpected reply")
-            val payload = JSONArray(line).at(0).at(2).str()
-                ?: throw IOException("$rpcId: empty reply")
+            // An empty payload carries Google's error code instead (e.g. [3] for a bad argument): keep it for the log.
+            val reply = JSONArray(line).at(0)
+            val payload = reply.at(2).str() ?: run {
+                val code = reply.at(5).at(0).long()
+                if (code == RESOURCE_EXHAUSTED) throw RateLimitedException(rpcId)
+                throw IOException("$rpcId: empty reply: ${line.take(300)}")
+            }
             return JSONTokener(payload).nextValue()
         }
     }
@@ -288,3 +297,9 @@ private fun Any?.list(): List<Any?> {
 private fun Any?.str(): String? = this as? String
 
 private fun Any?.long(): Long? = (this as? Number)?.toLong() ?: (this as? String)?.toLongOrNull()
+
+/** gRPC's RESOURCE_EXHAUSTED, which batchexecute answers with when asked too often in a short time. */
+private const val RESOURCE_EXHAUSTED = 8L
+
+/** Google Photos refused a request for now: too many in a short time (seen with a person's photos, page after page). */
+class RateLimitedException(rpcId: String) : IOException("$rpcId: rate limited by Google Photos")

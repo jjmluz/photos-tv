@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.jjmluz.photostv.app
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import okhttp3.Request
 import org.json.JSONArray
@@ -42,6 +43,7 @@ class GameProvider : ContentProvider() {
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle {
         check()
+        ready()
         val api = context!!.app.api
         return try {
             val json = runBlocking {
@@ -64,9 +66,19 @@ class GameProvider : ContentProvider() {
                         val pages = extras?.getInt("pages", 3)?.coerceIn(1, 20) ?: 3
                         val items = mutableListOf<MediaItem>()
                         var page: String? = null
-                        repeat(pages) {
-                            if (it > 0 && page == null) return@repeat
-                            val p = api.personItems(person, page)
+                        for (i in 0 until pages) {
+                            if (i > 0 && page == null) break
+                            // Gently: pages asked for back to back get refused (RESOURCE_EXHAUSTED).
+                            if (i > 0) kotlinx.coroutines.delay(PAGE_GAP_MS)
+                            val p = try {
+                                api.personItems(person, page)
+                            } catch (e: java.io.IOException) {
+                                // A later page failing still leaves the earlier ones to use.
+                                if (i == 0) throw e
+                                Log.w("PhotosTV", "Games: page ${i + 1} of ${person.key} failed: ${e.message}")
+                                break
+                            }
+                            Log.i("PhotosTV", "Games: page ${i + 1} of ${person.key}: ${p.items.size} items, more=${p.nextPageId != null}")
                             items += p.items
                             page = p.nextPageId
                         }
@@ -91,6 +103,7 @@ class GameProvider : ContentProvider() {
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         check()
+        ready()
         val segments = uri.pathSegments
         val key = segments.getOrNull(1) ?: throw FileNotFoundException(uri.toString())
         val url = when (segments.firstOrNull()) {
@@ -122,6 +135,21 @@ class GameProvider : ContentProvider() {
         return read
     }
 
+    /**
+     * Makes the app's HTTP client and API on the main thread before a binder thread uses them. A game can start
+     * this app just for the provider, whose calls then arrive while Application.onCreate is still running: a
+     * binder thread making the client (which asks WebView for its user agent, on the main thread) while the main
+     * thread waits for the same client in onCreate deadlocked both. On the main thread they're made in turn.
+     */
+    private fun ready() {
+        runBlocking(Dispatchers.Main) {
+            context!!.app.let {
+                it.http
+                it.api
+            }
+        }
+    }
+
     /** The permission is the provider's, but [call] isn't covered by it: check every request ourselves. */
     private fun check() {
         if (context!!.checkCallingPermission(PERMISSION) != PackageManager.PERMISSION_GRANTED) {
@@ -138,5 +166,6 @@ class GameProvider : ContentProvider() {
     companion object {
         const val PERMISSION = "com.jjmluz.photostv.permission.GAMES"
         private const val MAX_PEOPLE = 500
+        private const val PAGE_GAP_MS = 700L
     }
 }
