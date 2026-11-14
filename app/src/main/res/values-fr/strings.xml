@@ -90,4 +90,8 @@
     <string name="hint_resume">reprendre</string>
     <string name="hint_prev_next">photo précédente / suivante</string>
     <string name="hint_options">options</string>
+
+    <!-- The permission the family's TV games ask for (GameProvider) -->
+    <string name="games_permission_label">voir les personnes et les photos de Google Photos</string>
+    <string name="games_permission_description">voir les personnes de votre Google Photos, leurs photos et où elles ont été prises</string>
 </resources>

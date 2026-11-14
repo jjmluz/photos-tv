@@ -108,6 +108,13 @@ device in your account's security settings; the TV keeps it encrypted with a key
 Keystore, and signing out deletes it. Each account added keeps its own master token; the web session
 belongs to one account at a time, so switching makes a new one from that account's token.
 
+## For games on the same TV
+
+`data/GameProvider.kt` lets the family's TV games use the People of the signed-in account:
+the named people and their faces, a person's photos with the time each was taken, a photo's place, and the
+pictures, through `content://com.jjmluz.photostv.games`. Games never see the account's token or cookies. They
+need the `com.jjmluz.photostv.permission.GAMES` permission, which the TV asks the person in front of it about.
+
 ## Build
 
 You need Android Studio (its bundled JDK 21) and SDK platform 37.
