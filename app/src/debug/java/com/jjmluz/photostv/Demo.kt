@@ -118,7 +118,7 @@ private class DemoPhotosApi : PhotosApi(OkHttpClient()) {
     override suspend fun people(pageId: String?): Page<Person> = Page(peopleList, null)
 
     override suspend fun personItems(person: Person, pageId: String?): Page<MediaItem> =
-        slice(items.filterIndexed { i, _ -> i % 3 == peopleList.indexOf(person) % 3 }, pageId)
+        slice(items.filterIndexed { i, _ -> i % 3 == peopleList.indexOfFirst { it.key == person.key } % 3 }, pageId)
 
     override suspend fun location(key: String): String? {
         delay(150)
